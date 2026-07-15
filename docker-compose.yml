@@ -1,0 +1,31 @@
+services:
+  dashboard:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8080
+      AUTH_BYPASS: 'false'
+    volumes:
+      - mda-data:/app/data
+      # service account (read-only) montada de fora do repo, quando em modo sheet-api:
+      # - ./service-account.json:/app/service-account.json:ro
+    # SEM `ports:` — o acesso é só via cloudflared (túnel outbound). Sem porta pública.
+    networks: [mda]
+
+  # Túnel Cloudflare (origem sem porta pública). Requer TUNNEL_TOKEN no .env.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on: [dashboard]
+    networks: [mda]
+
+volumes:
+  mda-data:
+
+networks:
+  mda:

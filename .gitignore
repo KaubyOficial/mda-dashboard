@@ -1,0 +1,24 @@
+# deps
+node_modules/
+# build
+dist/
+web/dist/
+server/dist/
+# data (cache reconstruível — NÃO versionar)
+data/
+*.sqlite
+*.sqlite-journal
+*.db
+# secrets (NUNCA versionar — regra §5.4)
+.env
+.env.local
+*.serviceaccount.json
+service-account*.json
+# logs
+*.log
+# os
+.DS_Store
+Thumbs.db
+
+# CI (adicionar depois de: gh auth refresh -s workflow)
+.github/workflows/

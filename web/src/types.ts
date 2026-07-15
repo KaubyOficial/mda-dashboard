@@ -1,0 +1,115 @@
+/** Espelho dos DTOs da API (server/src/domain/metrics.ts) — só agregados, zero PII. */
+export interface Range {
+  from: string;
+  to: string;
+}
+export interface Delta {
+  current: number;
+  previous: number;
+  abs: number;
+  pct: number | null;
+  goodDirection: 'up' | 'down';
+  improved: boolean | null;
+}
+export interface Kpi {
+  key: string;
+  label: string;
+  value: number;
+  format: 'currency' | 'number' | 'percent' | 'ratio';
+  formula: string;
+  delta: Delta;
+}
+export interface DailyPoint {
+  date: string;
+  leads: number;
+  cpl: number | null;
+  investimento: number;
+  vendas: number;
+  faturamento: number;
+}
+export interface LeadsDetail {
+  porTemperatura: Record<string, number>;
+  porOrigem: Record<string, number>;
+  pagoVsOrganico: { pago: number; organico: number };
+  total: number;
+}
+export interface FunnelStep {
+  key: string;
+  label: string;
+  value: number;
+  rateFromPrev: number | null;
+}
+export interface MarketingFunnel {
+  steps: FunnelStep[];
+  costs: { cpc: number | null; custoPorFormulario: number | null; cpl: number | null };
+}
+export interface CommercialFunnel {
+  steps: FunnelStep[];
+  ticketMedio: number | null;
+  custoPorAgendamento: number | null;
+  custoPorVenda: number | null;
+}
+export interface SegmentRow {
+  segmento: string;
+  leads: number;
+  custoPorLead: number | null;
+  respostas: number;
+  taxaResposta: number | null;
+  agendamentos: number;
+  taxaAgendamento: number | null;
+  comparecimentos: number;
+  taxaComparecimento: number | null;
+  vendas: number;
+  taxaVenda: number | null;
+  conversaoTotal: number | null;
+  custoPorVenda: number | null;
+}
+export interface PublicoRow {
+  publico: string;
+  impressoes: number;
+  cpm: number | null;
+  cliques: number;
+  ctr: number | null;
+  leads: number;
+  mqls: number;
+  conversaoCliqueForms: number | null;
+  cpl: number | null;
+  custoPorMql: number | null;
+}
+export interface AnuncioRow {
+  anuncio: string;
+  impressoes: number;
+  ctr: number | null;
+  leadsTotais: number;
+  mornos: number;
+  mqls: number;
+  custoPorMql: number | null;
+  taxaCliqueForms: number | null;
+}
+export interface MetricsResponse {
+  range: Range;
+  previousRange: Range;
+  kpis: Kpi[];
+  daily: DailyPoint[];
+  leadsDetail: LeadsDetail;
+  marketingFunnel: MarketingFunnel;
+  commercialFunnel: CommercialFunnel;
+  segments: SegmentRow[];
+  porPublico: PublicoRow[];
+  porAnuncio: AnuncioRow[];
+  meta: {
+    lastSync: string | null;
+    stale: boolean;
+    source: string;
+    warnings: string[];
+    generatedAt: string;
+  };
+}
+export interface SyncResult {
+  status: 'ok' | 'error';
+  source: string;
+  counts: Record<string, number>;
+  warnings: string[];
+  error?: string;
+  skipped?: boolean;
+}

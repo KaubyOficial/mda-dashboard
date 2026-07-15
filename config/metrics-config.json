@@ -1,0 +1,11 @@
+{
+  "_doc": "Story 0.3 — parâmetros canônicos do glossário §4. Fonte única da verdade dos defaults de negócio.",
+  "timezone": "America/Sao_Paulo",
+  "currency": "BRL",
+  "default_ticket": 4297,
+  "operational_costs_enabled": false,
+  "qualification": {
+    "income_threshold_brl": 2000,
+    "known_min_period_label": "1 semana"
+  }
+}

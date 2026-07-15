@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #0a0908;
+  color: #f5f1e8;
+  font-family: system-ui, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-line bg-panel p-4;
+  }
+  .section-title {
+    @apply text-sm font-semibold uppercase tracking-widest text-muted;
+  }
+  .th {
+    @apply px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-muted;
+  }
+  .td {
+    @apply px-3 py-2 text-sm tabular-nums;
+  }
+}

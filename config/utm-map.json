@@ -1,0 +1,53 @@
+{
+  "_doc": "Story 0.2 — mapeamento UTM → temperatura/origem/pago-orgânico. Editável sem deploy. Regras avaliadas em ordem: a primeira que casar vence. 'match' casa por substring case-insensitive no campo indicado. Fallback = default_* no fim. Valores ancorados nas UTMs REAIS da aba LEADS (export 2026-06-11).",
+  "version": "2026-07-07",
+  "temperature_rules": [
+    {
+      "when": { "field": "medium", "contains": "lookalike-1-lista-de-compradores" },
+      "temperature": "quente",
+      "note": "lookalike de compradores = público mais quente"
+    },
+    {
+      "when": { "field": "campaign", "contains": "REMARKETING" },
+      "temperature": "quente"
+    },
+    {
+      "when": { "field": "medium", "contains": "caiu-captura" },
+      "temperature": "quente",
+      "note": "já passou pela captura — remarketing de convite"
+    },
+    {
+      "when": { "field": "medium", "contains": "ig-visitou-7d" },
+      "temperature": "quente"
+    },
+    {
+      "when": { "field": "medium", "contains": "envolvimento" },
+      "temperature": "morno",
+      "note": "públicos de envolvimento (7d/30d/180d)"
+    },
+    {
+      "when": { "field": "source", "contains": "BioOrganico" },
+      "temperature": "frio",
+      "note": "orgânico topo de funil"
+    },
+    {
+      "when": { "field": "medium", "contains": "social" },
+      "temperature": "frio"
+    }
+  ],
+  "default_temperature": "frio",
+  "origin_rules": [
+    { "when": { "field": "source", "contains": "BioOrganico" }, "origin": "bio" },
+    { "when": { "field": "medium", "contains": "biografia" }, "origin": "bio" },
+    { "when": { "field": "source", "contains": "FacebookADS" }, "origin": "anuncio" },
+    { "when": { "field": "source", "contains": "fb" }, "origin": "anuncio" },
+    { "when": { "field": "source", "contains": "ig" }, "origin": "anuncio" },
+    { "when": { "field": "source", "contains": "Comercial" }, "origin": "comercial" }
+  ],
+  "default_origin": "organico",
+  "paid_rules": {
+    "_doc": "Se a aba LEADS já traz coluna 'ORGANICO OU PAGO?', ela vence (normalizada). Estas regras são o fallback quando a coluna vem vazia.",
+    "paid_sources_contains": ["FacebookADS", "fb", "ig"],
+    "organic_sources_contains": ["BioOrganico", "Organico", "organico"]
+  }
+}
