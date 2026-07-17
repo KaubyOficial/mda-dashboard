@@ -7,12 +7,15 @@ import type { DataSnapshot } from '../src/domain/entities.js';
  */
 export function fixture(): DataSnapshot {
   return {
+    // utm.content casa com o anúncio pelo código (AD1 ↔ 'video-ad1') e utm.medium casa com o
+    // público pelo slug ('ig-visitou-7d' ↔ '00 - IG Visitou 7D') — igual ao dado real.
     leads: [
-      lead('L1', '2026-03-01', 'MQL', 'quente', 'pago', 'anuncio', 'AD1', 'a@x.test', '11999990001', 'ana souza'),
-      lead('L2', '2026-03-01', 'Morno', 'morno', 'pago', 'anuncio', 'AD1', 'b@x.test', '11999990002', 'bruno lima'),
-      lead('L3', '2026-03-02', 'Fora do perfil', 'frio', 'organico', 'bio', 'AD2', 'c@x.test', '11999990003', 'caio dias'),
-      lead('L4', '2026-03-02', 'MQL', 'quente', 'pago', 'anuncio', 'AD2', 'd@x.test', '11999990004', 'duda reis'),
-      lead('L5', '2026-03-02', 'Fora do perfil', 'frio', 'pago', 'anuncio', 'AD1', 'e@x.test', '11999990005', 'edu melo'),
+      lead('L1', '2026-03-01', 'MQL', 'quente', 'pago', 'anuncio', 'video-ad1', 'ig-visitou-7d', 'a@x.test', '11999990001', 'ana souza'),
+      lead('L2', '2026-03-01', 'Morno', 'morno', 'pago', 'anuncio', 'video-ad1', 'ig-visitou-7d', 'b@x.test', '11999990002', 'bruno lima'),
+      // orgânico: sem anúncio e com público que não existe na aba → entra no unmatched das duas atribuições
+      lead('L3', '2026-03-02', 'Fora do perfil', 'frio', 'organico', 'bio', 'link_in_bio', 'social', 'c@x.test', '11999990003', 'caio dias'),
+      lead('L4', '2026-03-02', 'MQL', 'quente', 'pago', 'anuncio', 'video-ad2', 'aberto-h-22-44', 'd@x.test', '11999990004', 'duda reis'),
+      lead('L5', '2026-03-02', 'Fora do perfil', 'frio', 'pago', 'anuncio', 'video-ad1', 'ig-visitou-7d', 'e@x.test', '11999990005', 'edu melo'),
     ],
     agendamentos: [
       ag('A1', '2026-03-03', 'CALL REALIZADA', 'a@x.test', '11999990001', 'ana souza'),
@@ -28,12 +31,13 @@ export function fixture(): DataSnapshot {
       md('2026-03-02', 300, 3000, 200, 80, 40, 30, 24),
     ],
     midiaPublico: [
-      { date: '2026-03-01', publico: 'PubA', investimentoBRL: 250, impressoes: 2500, cliques: 150, leads: 4 },
-      { date: '2026-03-02', publico: 'PubB', investimentoBRL: 150, impressoes: 1500, cliques: 150, leads: 2 },
+      { date: '2026-03-01', publico: '00 - IG Visitou 7D', investimentoBRL: 250, impressoes: 2500, cliques: 150, leads: 4 },
+      { date: '2026-03-02', publico: '00 - Aberto | H | 22 - 44', investimentoBRL: 150, impressoes: 1500, cliques: 150, leads: 2 },
     ],
+    // mqls aqui = coluna MQL da MÉTRICAS ADS, subcontada no dado real (por isso a atribuição vem da LEADS)
     midiaAnuncio: [
-      { date: '2026-03-01', anuncio: 'AD1', investimentoBRL: 200, impressoes: 2000, cliques: 150, lpViews: 60, vslPlays: 30, leads: 3, mqls: 1 },
-      { date: '2026-03-02', anuncio: 'AD2', investimentoBRL: 200, impressoes: 2000, cliques: 150, lpViews: 40, vslPlays: 20, leads: 2, mqls: 1 },
+      { date: '2026-03-01', anuncio: 'AD1 [OCDM] [VID] CAPTAÇÃO', investimentoBRL: 200, impressoes: 2000, cliques: 150, lpViews: 60, vslPlays: 30, leads: 3, mqls: 0 },
+      { date: '2026-03-02', anuncio: 'AD2 [OCDM] [VID] CAPTAÇÃO', investimentoBRL: 200, impressoes: 2000, cliques: 150, lpViews: 40, vslPlays: 20, leads: 2, mqls: 1 },
     ],
     warnings: [],
   };
@@ -47,6 +51,7 @@ function lead(
   pagoOrganico: DataSnapshot['leads'][number]['pagoOrganico'],
   origem: DataSnapshot['leads'][number]['origem'],
   content: string,
+  medium: string,
   emailKey: string,
   phoneKey: string,
   nameKey: string,
@@ -61,7 +66,7 @@ function lead(
     temperatura,
     origem,
     pagoOrganico,
-    utm: { source: 'FacebookADS', medium: 'ig-visitou-7d', campaign: 'OCDM', content, term: '' },
+    utm: { source: 'FacebookADS', medium, campaign: 'OCDM', content, term: '' },
     rendaBRL: qualificacao === 'Fora do perfil' ? 1000 : 5000,
     conhecePlusSemana: qualificacao === 'MQL',
   };

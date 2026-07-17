@@ -47,11 +47,16 @@ export interface FunnelStep {
   value: number;
   /** taxa vs etapa anterior (§4) — null na primeira etapa. */
   rateFromPrev: number | null;
+  /**
+   * Etapa sabidamente subcontada no período (o campo não foi rastreado em parte dos dias).
+   * Quando true, nem a taxa dela nem a da etapa seguinte são comparáveis — a UI mostra "—".
+   */
+  partial?: boolean;
 }
 
 export interface MarketingFunnel {
   steps: FunnelStep[];
-  costs: { cpc: number | null; custoPorFormulario: number | null; cpl: number | null };
+  costs: { cpc: number | null; cpl: number | null };
 }
 
 export interface CommercialFunnel {
@@ -84,6 +89,7 @@ export interface PublicoRow {
   cliques: number;
   ctr: number | null;
   leads: number;
+  mornos: number;
   mqls: number;
   conversaoCliqueForms: number | null;
   cpl: number | null;

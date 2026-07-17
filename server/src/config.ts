@@ -1,10 +1,21 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 /** raiz do projeto = server/src/.. /.. */
 export const PROJECT_ROOT = resolve(__dirname, '..', '..');
+
+/**
+ * Carrega o .env da raiz do projeto. Vars já presentes no ambiente VENCEM as do
+ * arquivo (precedência do process.loadEnvFile), então `DATA_SOURCE=x npm run dev`
+ * continua sobrepondo o .env. Sem .env, seguem os defaults do env().
+ */
+function loadEnvFile(): void {
+  const path = resolve(PROJECT_ROOT, '.env');
+  if (!existsSync(path)) return;
+  process.loadEnvFile(path);
+}
 
 function env(key: string, fallback = ''): string {
   const v = process.env[key];
@@ -32,6 +43,7 @@ export interface AppConfig {
 }
 
 export function loadConfig(): AppConfig {
+  loadEnvFile();
   return {
     dataSource: (env('DATA_SOURCE', 'mock') as AppConfig['dataSource']) || 'mock',
     csvRespostasPath: env('CSV_RESPOSTAS_PATH'),

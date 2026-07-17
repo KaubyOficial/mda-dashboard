@@ -20,7 +20,7 @@ function DeltaBadge({ kpi }: { kpi: Kpi }) {
 
 export function KpiHero({ kpis }: { kpis: Kpi[] }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
       {kpis.map((k) => (
         <div key={k.key} className="card group relative" title={k.formula}>
           <div className="text-xs uppercase tracking-wider text-muted">{k.label}</div>

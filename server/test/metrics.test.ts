@@ -24,6 +24,15 @@ test('KPIs — valores canônicos (§4) calculados à mão', () => {
   near(kpi(r, 'cac').value, 200); // 400/2
   near(kpi(r, 'conversao').value, 40); // 2/5 = 40%
   near(kpi(r, 'roas').value, 20.735); // 8294/400
+  near(kpi(r, 'vendas').value, 2); // nº de vendas no período
+  near(kpi(r, 'cpm').value, 100); // 400 ÷ 4000 impressões × 1000
+});
+
+test('KPI CPM — sem impressões vira 0 (safeDiv), não NaN/Infinity', () => {
+  const f = fixture();
+  f.midiaDiaria = f.midiaDiaria.map((m) => ({ ...m, impressoes: 0 }));
+  const r = computeMetrics(f, MARCO, META);
+  assert.equal(kpi(r, 'cpm').value, 0);
 });
 
 test('delta vs período anterior — mês-atual sem dados no mês anterior', () => {
@@ -61,8 +70,58 @@ test('funil de marketing — etapas, taxas e custos', () => {
   near(byKey.cliques!.rateFromPrev, 0.075); // 300/4000
   near(byKey.cliqueLP!.rateFromPrev, 0.4); // 120/300
   near(mf.costs.cpc, 400 / 300);
-  near(mf.costs.custoPorFormulario, 400 / 36);
   near(mf.costs.cpl, 80);
+});
+
+test('funil de marketing — sem etapa "Forms finalizados" (era a coluna Leads da mídia = métrica duplicada)', () => {
+  const mf = computeMetrics(fixture(), MARCO, META).marketingFunnel;
+  assert.equal(
+    mf.steps.find((s) => s.key === 'formsFinalizados'),
+    undefined,
+  );
+  assert.ok(!mf.steps.some((s) => /finalizad/i.test(s.label)));
+  // a última etapa é Leads, vinda da aba LEADS (mesma fonte do KPI)
+  assert.equal(mf.steps.at(-1)!.key, 'leads');
+  assert.equal(mf.steps.at(-1)!.value, 5);
+});
+
+test('funil de marketing — IniciouForms não rastreado: avisa E suprime as taxas incomparáveis', () => {
+  const f = fixture();
+  // 03-01 tem lead (forms_finalizados 12) mas IniciouForms vazio → subcontagem silenciosa
+  f.midiaDiaria = f.midiaDiaria.map((m) => (m.date === '2026-03-01' ? { ...m, formsIniciados: 0 } : m));
+  const r = computeMetrics(f, MARCO, META);
+  assert.ok(
+    r.meta.warnings.some((w) => /FUNIL DE MARKETING/.test(w) && /Início forms/.test(w) && /2026-03-02/.test(w)),
+    `esperado warning de rastreio; veio: ${JSON.stringify(r.meta.warnings)}`,
+  );
+  const byKey = Object.fromEntries(r.marketingFunnel.steps.map((s) => [s.key, s]));
+  assert.equal(byKey.formsIniciados!.partial, true);
+  // a etapa parcial não é comparável nem com a anterior nem com a seguinte
+  assert.equal(byKey.formsIniciados!.rateFromPrev, null);
+  assert.equal(byKey.leads!.rateFromPrev, null);
+  // as etapas que não dependem dela seguem com taxa normal
+  near(byKey.cliqueLP!.rateFromPrev, 0.4);
+});
+
+test('funil de marketing — com rastreio completo, taxas normais e nada de "parcial"', () => {
+  const r = computeMetrics(fixture(), MARCO, META);
+  const byKey = Object.fromEntries(r.marketingFunnel.steps.map((s) => [s.key, s]));
+  assert.ok(!byKey.formsIniciados!.partial);
+  near(byKey.formsIniciados!.rateFromPrev, 45 / 120);
+  near(byKey.leads!.rateFromPrev, 5 / 45);
+  assert.ok(!r.meta.warnings.some((w) => /Início forms/.test(w)));
+});
+
+test('funil de marketing — sem etapa de Play VSL; início de forms encadeia no clique da LP', () => {
+  const mf = computeMetrics(fixture(), MARCO, META).marketingFunnel;
+  assert.equal(
+    mf.steps.find((s) => s.key === 'vslPlays'),
+    undefined,
+  );
+  assert.ok(!mf.steps.some((s) => /vsl/i.test(s.label)));
+  const byKey = Object.fromEntries(mf.steps.map((s) => [s.key, s]));
+  // sem o VSL no meio, a taxa passa a ser forms iniciados ÷ cliques na LP
+  near(byKey.formsIniciados!.rateFromPrev, 45 / 120);
 });
 
 test('funil comercial — etapas por data + custos', () => {
@@ -102,27 +161,58 @@ test('segmentos de qualificação — matriz 3×métricas (§S7)', () => {
   assert.equal(fora.taxaComparecimento, null); // 0/0
 });
 
-test('relatório por anúncio — leads/MQL da própria aba MÉTRICAS ADS (§S9)', () => {
+test('relatório por anúncio — impressões/CTR da aba ADS + MQL/Morno atribuídos da LEADS por utm_content (§S9)', () => {
   const ads = computeMetrics(fixture(), MARCO, META).porAnuncio;
-  const ad1 = ads.find((a) => a.anuncio === 'AD1')!;
-  assert.equal(ad1.leadsTotais, 3); // Action Leads da aba
-  assert.equal(ad1.mqls, 1); // MQL da aba
+  const ad1 = ads.find((a) => a.anuncio === 'AD1 [OCDM] [VID] CAPTAÇÃO')!;
+  assert.equal(ad1.leadsTotais, 3); // Action Leads da aba (mídia)
   near(ad1.ctr, 0.075); // 150/2000
-  near(ad1.custoPorMql, 200); // 200/1
   near(ad1.taxaCliqueForms, 3 / 150); // leads/cliques
-  const ad2 = ads.find((a) => a.anuncio === 'AD2')!;
+  // L1 (MQL) + L2 (Morno) + L5 (Fora) têm utm_content 'video-ad1' → casam com 'AD1 …' pelo código
+  assert.equal(ad1.mqls, 1);
+  assert.equal(ad1.mornos, 1);
+  near(ad1.custoPorMql, 200); // 200/1 — apesar da coluna MQL da aba estar 0 nesse anúncio
+  const ad2 = ads.find((a) => a.anuncio === 'AD2 [OCDM] [VID] CAPTAÇÃO')!;
   assert.equal(ad2.leadsTotais, 2);
-  assert.equal(ad2.mqls, 1);
+  assert.equal(ad2.mqls, 1); // L4
+  assert.equal(ad2.mornos, 0);
+});
+
+test('relatório por anúncio — a coluna MQL da aba ADS NÃO é a fonte (regressão: vinha quase tudo zerado)', () => {
+  const f = fixture();
+  // zera a coluna MQL da aba de ads: a atribuição pela LEADS tem que continuar de pé
+  f.midiaAnuncio = f.midiaAnuncio.map((a) => ({ ...a, mqls: 0 }));
+  const ads = computeMetrics(f, MARCO, META).porAnuncio;
+  assert.equal(ads.find((a) => a.anuncio === 'AD1 [OCDM] [VID] CAPTAÇÃO')!.mqls, 1);
+  assert.equal(ads.find((a) => a.anuncio === 'AD2 [OCDM] [VID] CAPTAÇÃO')!.mqls, 1);
 });
 
 test('relatório por público — leads/CPL reais da aba TOP PÚBLICOS (§S8)', () => {
   const pubs = computeMetrics(fixture(), MARCO, META).porPublico;
-  const a = pubs.find((p) => p.publico === 'PubA')!;
+  const a = pubs.find((p) => p.publico === '00 - IG Visitou 7D')!;
   near(a.cpm, 100); // 250*1000/2500
   near(a.ctr, 0.06); // 150/2500
-  assert.equal(a.leads, 4);
+  assert.equal(a.leads, 4); // leads da própria aba TOP PÚBLICOS (não mexemos)
   near(a.cpl, 62.5); // 250/4
-  assert.equal(a.custoPorMql, null); // aba não tem MQL por público
+  // MQL/Morno vêm da LEADS por utm_medium: L1 (MQL) + L2 (Morno) + L5 (Fora) são 'ig-visitou-7d'
+  assert.equal(a.mqls, 1);
+  assert.equal(a.mornos, 1);
+  near(a.custoPorMql, 250); // 250/1
+  const b = pubs.find((p) => p.publico === '00 - Aberto | H | 22 - 44')!;
+  assert.equal(b.mqls, 1); // L4
+  assert.equal(b.mornos, 0);
+});
+
+test('relatório por público — lead cujo utm_medium não existe na aba não é chutado em ninguém', () => {
+  const r = computeMetrics(fixture(), MARCO, META);
+  // L3 é 'social' (orgânico) → não casa com nenhum público
+  const somaMql = r.porPublico.reduce((s, p) => s + p.mqls, 0);
+  const somaMorno = r.porPublico.reduce((s, p) => s + p.mornos, 0);
+  assert.equal(somaMql, 2); // L1 e L4 — L3 (Fora do perfil) não vira MQL de ninguém
+  assert.equal(somaMorno, 1); // L2
+  assert.ok(
+    r.meta.warnings.some((w) => /POR PÚBLICO/.test(w) && /não casaram/.test(w)),
+    'esperado warning declarando os leads não casados',
+  );
 });
 
 test('detalhe de leads — temperatura/origem/pago (§S4)', () => {

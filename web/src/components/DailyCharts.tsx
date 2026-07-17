@@ -85,10 +85,7 @@ export function DailyCharts({ daily, roas }: { daily: DailyPoint[]; roas: number
                   labelFormatter={fmtDayShort}
                   formatter={(v: number, n: string) => [fmtCurrency(v), n]}
                 />
-                <ReferenceLine
-                  y={0}
-                  stroke={GRID}
-                />
+                <ReferenceLine y={0} stroke={GRID} />
                 <Bar dataKey="investimento" name="Investimento" fill="#FF6B6B" radius={[3, 3, 0, 0]} />
                 <Bar dataKey="faturamento" name="Vendas (R$)" fill="#37D67A" radius={[3, 3, 0, 0]} />
               </BarChart>

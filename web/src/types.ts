@@ -38,10 +38,12 @@ export interface FunnelStep {
   label: string;
   value: number;
   rateFromPrev: number | null;
+  /** etapa subcontada no período (campo não rastreado em parte dos dias) */
+  partial?: boolean;
 }
 export interface MarketingFunnel {
   steps: FunnelStep[];
-  costs: { cpc: number | null; custoPorFormulario: number | null; cpl: number | null };
+  costs: { cpc: number | null; cpl: number | null };
 }
 export interface CommercialFunnel {
   steps: FunnelStep[];
@@ -71,6 +73,7 @@ export interface PublicoRow {
   cliques: number;
   ctr: number | null;
   leads: number;
+  mornos: number;
   mqls: number;
   conversaoCliqueForms: number | null;
   cpl: number | null;

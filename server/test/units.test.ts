@@ -5,6 +5,7 @@ import { normalizeEmail, normalizePhone } from '../src/util/keys.js';
 import { classifyByAnswers, normalizeConhece } from '../src/normalize/qualification.js';
 import { previousRange, validateRange, RangeError, daysInclusive } from '../src/metrics/period.js';
 import { enrichLeads } from '../src/crossjoin/match.js';
+import { adCode, publicoSlug } from '../src/crossjoin/attribution.js';
 import { mapOrigem, mapTemperatura, type UtmMap } from '../src/normalize/utm.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -115,4 +116,33 @@ test('enrichLeads — vendas casam por nome (aba VENDAS só tem nome) + não atr
   const r2 = enrichLeads(f);
   assert.equal(r2.report.unmatched, 1);
   assert.equal(r2.unattributedVendas[0]!.valorBRL, 999);
+});
+
+test('adCode — casa utm_content do lead com o nome do anúncio da aba', () => {
+  // dado real: 'video-ad02' (utm) precisa casar com 'AD02 [OCDM] [VID] CAPTAÇÃO - …' (aba)
+  assert.equal(adCode('video-ad02'), '02');
+  assert.equal(adCode('AD02 [OCDM] [VID] CAPTAÇÃO - IMAGINA EU CRIANDO SEU CANAL'), '02');
+  assert.equal(adCode('video-ad2'), '02'); // padding: ad2 e ad02 são o mesmo anúncio
+  assert.equal(adCode('AD44 [OCDM] [VID] CAPTAÇÃO - QUAL É A MELHOR FORMA V4'), '44');
+  // sem código → não casa com ninguém (não pode virar atribuição no chute)
+  assert.equal(adCode('link_in_bio'), null);
+  assert.equal(adCode('organico'), null);
+  assert.equal(adCode('120232344800710100'), null);
+  assert.equal(adCode(''), null);
+});
+
+test('publicoSlug — casa utm_medium do lead com o nome do público da aba', () => {
+  assert.equal(publicoSlug('00 - IG Visitou 7D'), 'ig-visitou-7d');
+  assert.equal(publicoSlug('ig-visitou-7d'), 'ig-visitou-7d');
+  // acento, %, + e o espaço a mais que aparece no dado real têm que colapsar no mesmo slug
+  assert.equal(
+    publicoSlug('00 - Caiu Captura 180D + VV Convite 50% 30D + Envolvimento 1D'),
+    publicoSlug('caiu-captura-180d-vv-convite-50-30D-envolvimento-1d'),
+  );
+  assert.equal(
+    publicoSlug('caiu-captura-180d-vv-convite-50- 30D-envolvimento-1d'),
+    publicoSlug('caiu-captura-180d-vv-convite-50-30D-envolvimento-1d'),
+  );
+  assert.equal(publicoSlug('00 - Aberto | H | 22 - 44'), 'aberto-h-22-44');
+  assert.equal(publicoSlug('(sem público)'), 'sem-publico');
 });
