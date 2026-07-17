@@ -14,7 +14,7 @@ import type {
 import type { EnrichedLead } from '../crossjoin/match.js';
 import { enrichLeads } from '../crossjoin/match.js';
 import { qualifByAnuncio, qualifByPublico } from '../crossjoin/attribution.js';
-import { isInRange, eachDay, previousRange } from './period.js';
+import { isInRange, eachDay, previousRange, daysInclusive } from './period.js';
 import { makeDelta, safeDiv, sum } from './helpers.js';
 
 interface BaseAgg {
@@ -382,6 +382,8 @@ export function computeMetrics(
   const cur = baseAgg(enriched, snap, range);
   const prev = baseAgg(enriched, snap, prevRange);
   const warnings: string[] = [...meta.extraWarnings, ...snap.warnings];
+  const midiaGap = midiaCoverageWarning(snap, range);
+  if (midiaGap) warnings.push(midiaGap);
 
   return {
     range,
@@ -406,4 +408,33 @@ export function computeMetrics(
 
 function dedupe(arr: string[]): string[] {
   return [...new Set(arr)];
+}
+
+/**
+ * A aba ACOMPANHAMENTO DIÁRIO é preenchida à mão e vive atrasada em relação a LEADS/VENDAS
+ * (em 2026-07-16: mídia parava em 20/06, leads chegavam a 16/07). Quando o período pedido passa
+ * do último dia com mídia, investimento/CPL/CAC/ROAS ficam subcontados — e "lucro" fica
+ * otimista, porque conta receita nova sem o gasto correspondente.
+ *
+ * Mesma política já adotada no funil de marketing (etapa `partial`): é melhor avisar do que
+ * exibir número sabidamente errado como se fosse fato. Aqui só avisamos — os KPIs seguem sendo
+ * a soma fiel do que a planilha tem.
+ */
+/** Atraso normal de preenchimento (o gasto do dia entra no fim do dia). Acima disso, é buraco. */
+const MIDIA_LAG_TOLERANCIA_DIAS = 2;
+
+function midiaCoverageWarning(snap: DataSnapshot, range: Range): string | null {
+  const dias = snap.midiaDiaria.filter((m) => m.date).map((m) => m.date);
+  if (dias.length === 0) return null;
+  const ultimoDiaComMidia = dias.reduce((a, b) => (a > b ? a : b));
+  if (ultimoDiaComMidia >= range.to) return null;
+  // O gasto do próprio dia só é lançado no fim do dia: 1 dia de atraso é operação normal,
+  // não incidente. Avisar todo dia treinaria o usuário a ignorar os avisos.
+  const diasSemMidia = daysInclusive({ from: ultimoDiaComMidia, to: range.to }) - 1;
+  if (diasSemMidia < MIDIA_LAG_TOLERANCIA_DIAS) return null;
+  // Só avisa se o buraco intersecta o período pedido.
+  if (range.from > ultimoDiaComMidia) {
+    return `MÍDIA: a aba ACOMPANHAMENTO DIÁRIO não tem NENHUM dia do período (último dia preenchido: ${ultimoDiaComMidia}). Investimento, CPL, CAC e ROAS aparecem zerados e o Lucro ignora o gasto real — preencher a aba.`;
+  }
+  return `MÍDIA: a aba ACOMPANHAMENTO DIÁRIO só vai até ${ultimoDiaComMidia}, antes do fim do período (${range.to}). Investimento/CPL/CAC/ROAS estão subcontados e o Lucro, otimista — preencher a aba.`;
 }

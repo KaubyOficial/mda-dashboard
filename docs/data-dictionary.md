@@ -1,7 +1,19 @@
 # Dicionário de Dados — Dashboard MDA (Story 0.1)
 
-> Baseado na CÓPIA COMPLETA real (`SHEET_ID=1Y2swiHYvyxYADG6rD1hKuu8LTyM_lvx8GJue6zk0y3A`), lida na íntegra em 2026-07-07.
+> **Fonte VIVA desde 2026-07-16:** planilha REAL `SHEET_ID=1M3B5pgTk1yLZhofUQFH_l9vTIAlxb5aejFnvfxpcNx0`
+> ("Mestres do Algoritmo | OCDM"), via `DATA_SOURCE=sheet-api` + service account read-only.
+> Mapeamento original feito em 2026-07-07 sobre a CÓPIA (`1Y2sw…`), hoje congelada — estrutura
+> confirmada idêntica na real (mesmas 11 abas, mesmos gids).
 > **11 abas.** O funil da mentoria (OCDM / status APLICAÇÃO) usa 6 delas; as abas **C2** são de OUTRO funil e ficam fora da V1.
+
+> ⚠️ **A aba de mídia tem nome com 2 ESPAÇOS À ESQUERDA na planilha real: `"  ACOMPANHAMENTO DIÁRIO"`.**
+> Por isso o `sheet-api` resolve aba por nome **normalizado** (trim + colapso de espaço + sem acento +
+> caixa). Match exato falharia com "aba não encontrada" → investimento 0.
+>
+> ⚠️ **A aba de mídia vive atrasada:** em 2026-07-16 o último dia preenchido era **20/06/2026**,
+> enquanto LEADS chegava a 16/07. Quando o período pedido passa disso, o motor emite warning
+> `MÍDIA: …` (investimento/CPL/CAC/ROAS subcontados, Lucro otimista). Não é bug do parser — é
+> preenchimento manual em atraso.
 
 ## Mapa de abas → gid → entidade
 

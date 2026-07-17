@@ -48,6 +48,49 @@ DATA_SOURCE=sheet-csv node --experimental-sqlite server/dist/index.js
 - **Ajustar parâmetros de métrica:** `config/metrics-config.json` (fuso, moeda, ticket padrão).
 - **Rotação de segredos:** gerar nova service account key no GCP → substituir o JSON no servidor → `docker compose restart`. Revogar a antiga. A SA é **read-only** e com acesso só à planilha da mentoria.
 
+## Service account (sheet-api) — ligar na planilha REAL
+
+> **Por que existe:** o modo `sheet-csv` lê por link público. A planilha real tem **PII de lead**
+> (nome, telefone, e-mail) e não pode ser pública → produção usa `sheet-api` (Sheets API v4
+> read-only + service account). Decisão (Kauê, 2026-07-16): **SA própria da MDA**, criada na conta
+> dona da planilha — sem misturar com o projeto GCP do REDE F.
+
+**Setup (1×, ~5 min).** Logado na conta Google **dona da planilha** (a da MDA):
+
+1. **Criar projeto:** <https://console.cloud.google.com/projectcreate> → nome `mda-dashboard` → Create.
+2. **Ativar a API:** APIs & Services → Library → buscar **Google Sheets API** → **Enable**
+   (com o projeto `mda-dashboard` selecionado no seletor do topo).
+3. **Criar a service account:** IAM & Admin → Service Accounts → **+ Create service account**
+   → nome `mda-dashboard-reader` → **Create and continue** → **sem** papel (não precisa de
+   papel IAM: o acesso vem do compartilhamento da planilha) → **Done**.
+4. **Baixar a chave:** clicar na SA → aba **Keys** → Add key → **Create new key** → **JSON** → Create.
+   Salvar como `MDA/mda-dashboard/service-account-mda.json`
+   (`service-account*.json` já é gitignored — a chave nunca vai pro git).
+5. **Compartilhar a planilha:** abrir a planilha **REAL** "Mestres do Algoritmo | OCDM" →
+   **Compartilhar** → colar o e-mail da SA (`...@mda-dashboard.iam.gserviceaccount.com`,
+   está no campo `client_email` do JSON) → permissão **Leitor** → desmarcar "Notificar" → Enviar.
+6. **Apontar o `.env`:** `DATA_SOURCE=sheet-api` e `SHEET_ID=` o ID da planilha REAL
+   (o trecho entre `/d/` e `/edit` na URL).
+7. **Sincronizar:** `npm run sync --workspace server`.
+
+**Diagnóstico** — os erros já vêm traduzidos com a ação:
+
+| Erro | Causa | Ação |
+|---|---|---|
+| `403 — a planilha X NÃO está compartilhada com <sa>` | passo 5 não feito | compartilhar como Leitor |
+| `403 — a Google Sheets API está DESATIVADA` | passo 2 não feito | Enable no projeto certo |
+| `404 — planilha X não encontrada` | `SHEET_ID` errado | usar o ID entre `/d/` e `/edit` |
+| `Abas não encontradas: …` (lista as existentes) | aba renomeada na real | ajustar `SHEET_TAB_*` no `.env` |
+| `429 — quota da Sheets API` | sync agressivo | subir `SYNC_INTERVAL_MINUTES` |
+
+**Notas.**
+- Aba é resolvida por **NOME**, não por gid: gid não é estável entre cópia e planilha real, e
+  ler a aba errada silenciosamente é o pior modo de falhar num dashboard financeiro. O match
+  tolera acento/caixa/espaço extra; se não achar, **falha alto** listando as abas existentes.
+- Token de SA renova sozinho (headless, sem expiração de refresh token) — ao contrário de OAuth
+  de usuário, que exigiria reautorização periódica.
+- Rotação: ver "Rotação de segredos" acima.
+
 ## Monitoramento (Story 7.2)
 
 - `/healthz` → liveness. `/api/health` → `{ lastSync, stale, syncing }`.

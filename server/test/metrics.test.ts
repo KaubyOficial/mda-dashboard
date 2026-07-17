@@ -241,3 +241,35 @@ test('sensibilidade — mutar uma venda muda o faturamento (prova do golden)', (
   const mutated = computeMetrics(f, MARCO, META).kpis.find((k) => k.key === 'faturamento')!.value;
   assert.equal(mutated - base, 1000);
 });
+
+// --- Cobertura da mídia (achado real 2026-07-16: mídia parava em 20/06, leads em 16/07) ---
+
+const midiaWarn = (r: ReturnType<typeof computeMetrics>) =>
+  r.meta.warnings.find((w) => w.startsWith('MÍDIA:')) ?? null;
+
+test('mídia — avisa quando a aba não cobre o fim do período (KPIs subcontados)', () => {
+  // fixture: mídia só em 01–02/03; período vai até 31/03 → 29 dias sem mídia.
+  const r = computeMetrics(fixture(), MARCO, META);
+  const w = midiaWarn(r);
+  assert.ok(w, 'deveria avisar que a mídia não cobre o período');
+  assert.match(w, /só vai até 2026-03-02/);
+  assert.match(w, /subcontados/);
+});
+
+test('mídia — sem aviso quando a aba cobre o período inteiro', () => {
+  const r = computeMetrics(fixture(), { from: '2026-03-01', to: '2026-03-02' }, META);
+  assert.equal(midiaWarn(r), null);
+});
+
+test('mídia — atraso de 1 dia é normal e NÃO vira aviso (senão avisa todo dia)', () => {
+  const r = computeMetrics(fixture(), { from: '2026-03-01', to: '2026-03-03' }, META);
+  assert.equal(midiaWarn(r), null, 'gasto do dia entra no fim do dia — 1 dia de lag é operação normal');
+});
+
+test('mídia — período INTEIRO sem mídia avisa que investimento/CAC/ROAS estão zerados', () => {
+  const r = computeMetrics(fixture(), { from: '2026-03-10', to: '2026-03-31' }, META);
+  const w = midiaWarn(r);
+  assert.ok(w, 'deveria avisar');
+  assert.match(w, /NENHUM dia do período/);
+  assert.match(w, /último dia preenchido: 2026-03-02/);
+});

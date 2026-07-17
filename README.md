@@ -12,13 +12,24 @@ Dashboard web de página única com todos os números do funil high-ticket do Ca
 Dois terminais, a partir da raiz do projeto:
 ```bash
 npm install
-cp .env.example .env      # o server lê este arquivo no boot (DATA_SOURCE=mock por padrão)
+cp .env.example .env      # o server lê este arquivo no boot; ajuste DATA_SOURCE (ver tabela abaixo)
 npm run dev               # terminal 1 — API em :8080 (sync inicial só se o cache estiver vazio)
 npm run dev:web           # terminal 2 — UI em :5173 (é a URL que se abre; faz proxy do /api pra :8080)
 ```
-Para ver os **dados reais**, use `DATA_SOURCE=sheet-csv` no `.env` (o `.env.example` já traz `SHEET_ID` + os 6 gids).
 Vars setadas no shell vencem as do `.env`, então dá pra sobrepor pontualmente:
 `DATA_SOURCE=mock npm run dev` (bash) · `$env:DATA_SOURCE="mock"; npm run dev` (PowerShell).
+
+### Fontes de dados (`DATA_SOURCE`)
+| Modo | Lê de | Quando usar |
+|---|---|---|
+| `sheet-api` | **planilha REAL**, Sheets API v4 read-only + service account | **produção** — é o único que lê a planilha viva |
+| `sheet-csv` | cópia via link público, export CSV por gid | dev sem credencial |
+| `csv` | exports locais de LEADS | dev offline |
+| `mock` | dados sintéticos | UI sem planilha |
+
+`sheet-csv` só funciona em planilha **"qualquer pessoa com o link"**. A planilha real tem **PII de lead**
+(nome/telefone/e-mail) e não deve ser pública → produção é `sheet-api`. Setup da service account
+(~5 min, 1×): **`docs/runbook.md` § Service account (sheet-api)**.
 
 > ⚠️ O cache SQLite (`data/mda.sqlite`) é compartilhado entre as fontes e o sync é *full refresh*: subir com
 > `DATA_SOURCE=mock` sobrescreve os dados reais do cache no primeiro sync do intervalo (~20 min).
@@ -28,11 +39,18 @@ Vars setadas no shell vencem as do `.env`, então dá pra sobrepor pontualmente:
 |---|---|
 | `npm run lint` | ESLint (0 warnings) |
 | `npm run typecheck` | tsc server + web |
-| `npm test` | golden tests do motor de métricas (21) |
+| `npm test` | golden tests do motor de métricas + auth/Sheets API (39) |
 | `npm run build` | build web + server |
 | `npm run sync --workspace server` | sync avulso (reconciliação) |
 
-## Estado (2026-07-07)
-Núcleo **completo, ligado à CÓPIA real (6 abas OCDM) e reconciliado ao centavo** (faturamento R$ 819.622,40 · investimento R$ 63.021,88 · 5.181 leads · 203 vendas): scaffold, data layer, motor de métricas com golden tests, UI das 9 seções, segurança (JWT Access + headers + rate limit), Docker/CI/runbook. **Bloqueado só em decisões externas:** hosting/Cloudflare (Kauê, Story 1.2), service account p/ produção (5.4/7.3). Ver `docs/stories/README.md` e `docs/data-dictionary.md`.
+## Estado (2026-07-16)
+Núcleo **completo e reconciliado ao centavo** (faturamento R$ 819.622,40 · investimento R$ 63.021,88 ·
+5.181 leads · 203 vendas): scaffold, data layer, motor de métricas com golden tests, UI das 9 seções,
+segurança (JWT Access + headers + rate limit), Docker/CI/runbook.
 
-Para rodar contra a planilha real: `cp .env.example .env` (já vem com `SHEET_ID` + gids reais) → trocar para `DATA_SOURCE=sheet-csv` no `.env` → `npm run dev`.
+**Modo `sheet-api` implementado (2026-07-16)** — antes era um stub que lançava erro. Motivo: a fonte
+em uso (`sheet-csv`) era uma **cópia congelada em 2026-07-07** (último lead 07/07), que nunca
+atualizaria. Falta só o setup manual da service account (runbook § Service account) para ler a
+planilha **viva**. Outro bloqueio externo: hosting/Cloudflare (Kauê, Story 1.2).
+
+Ver `docs/stories/README.md` e `docs/data-dictionary.md`.

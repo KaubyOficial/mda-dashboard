@@ -22,12 +22,22 @@ function env(key: string, fallback = ''): string {
   return v === undefined || v === '' ? fallback : v;
 }
 
+/**
+ * Resolve path relativo contra a RAIZ do projeto, não contra o cwd — `npm run sync`
+ * roda de server/ e o servidor roda da raiz; um "./service-account.json" precisa
+ * apontar para o mesmo arquivo nos dois casos.
+ */
+function resolvePath(p: string): string {
+  return p ? resolve(PROJECT_ROOT, p) : '';
+}
+
 export interface AppConfig {
   dataSource: 'csv' | 'mock' | 'sheet-csv' | 'sheet-api';
   csvRespostasPath: string;
   csvLeadsPath: string;
   sheetId: string;
   sheetGids: Record<string, string>;
+  sheetTabs: Record<string, string>;
   googleServiceAccountJson: string;
   syncIntervalMinutes: number;
   timezone: string;
@@ -58,7 +68,19 @@ export function loadConfig(): AppConfig {
       midiaPublico: env('SHEET_GID_MIDIA_PUBLICO'),
       midiaAnuncio: env('SHEET_GID_MIDIA_ANUNCIO'),
     },
-    googleServiceAccountJson: env('GOOGLE_SERVICE_ACCOUNT_JSON', './service-account.json'),
+    // Nomes das abas — contrato do modo sheet-api. Defaults = docs/data-dictionary.md;
+    // só precisam ir ao .env se a planilha real renomear alguma aba.
+    sheetTabs: {
+      leads: env('SHEET_TAB_LEADS', 'LEADS'),
+      agendamentos: env('SHEET_TAB_AGENDAMENTOS', 'AGENDAMENTOS & CALL'),
+      vendas: env('SHEET_TAB_VENDAS', 'VENDAS'),
+      midiaDiaria: env('SHEET_TAB_MIDIA_DIARIA', 'ACOMPANHAMENTO DIÁRIO'),
+      midiaPublico: env('SHEET_TAB_MIDIA_PUBLICO', 'TOP PÚBLICOS'),
+      midiaAnuncio: env('SHEET_TAB_MIDIA_ANUNCIO', 'MÉTRICAS ADS'),
+    },
+    googleServiceAccountJson: resolvePath(
+      env('GOOGLE_SERVICE_ACCOUNT_JSON', './service-account.json'),
+    ),
     syncIntervalMinutes: Number(env('SYNC_INTERVAL_MINUTES', '20')),
     timezone: env('TIMEZONE', 'America/Sao_Paulo'),
     currency: env('CURRENCY', 'BRL'),

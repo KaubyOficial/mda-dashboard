@@ -15,12 +15,19 @@ export function createDataSource(cfg: AppConfig): DataSource {
       if (!cfg.csvLeadsPath) throw new Error('CSV_LEADS_PATH vazio para DATA_SOURCE=csv.');
       return new CsvSource({ leadsPath: cfg.csvLeadsPath, utmMap });
     case 'sheet-csv':
-      return new SheetSource({ mode: 'sheet-csv', sheetId: cfg.sheetId, gids: cfg.sheetGids, utmMap });
+      return new SheetSource({
+        mode: 'sheet-csv',
+        sheetId: cfg.sheetId,
+        gids: cfg.sheetGids,
+        tabs: cfg.sheetTabs,
+        utmMap,
+      });
     case 'sheet-api':
       return new SheetSource({
         mode: 'sheet-api',
         sheetId: cfg.sheetId,
         gids: cfg.sheetGids,
+        tabs: cfg.sheetTabs,
         serviceAccountJsonPath: cfg.googleServiceAccountJson,
         utmMap,
       });
