@@ -23,6 +23,8 @@ function Donut({ data }: { data: { name: string; value: number; color: string }[
         </Pie>
         <Tooltip
           contentStyle={{ background: '#1D1A16', border: '1px solid #2A2621', borderRadius: 8 }}
+          // Pie não põe `color` no payload do tooltip, e o recharts cai em '#000' — invisível no dark.
+          itemStyle={{ color: '#F5F1E8' }}
           formatter={(v: number, n: string) => [fmtNumber(v), n]}
         />
       </PieChart>

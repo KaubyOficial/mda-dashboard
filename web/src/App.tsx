@@ -129,7 +129,7 @@ export function App() {
         )}
       </main>
       <footer className="border-t border-line py-6 text-center text-xs text-muted">
-        MDA Dashboard · dados agregados, sem PII · gerado {data ? new Date(data.meta.generatedAt).toLocaleString('pt-BR') : ''}
+        MDA Dashboard · gerado {data ? new Date(data.meta.generatedAt).toLocaleString('pt-BR') : ''}
       </footer>
     </div>
   );
