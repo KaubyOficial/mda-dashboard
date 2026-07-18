@@ -40,6 +40,8 @@ export interface FunnelStep {
   rateFromPrev: number | null;
   /** etapa subcontada no período (campo não rastreado em parte dos dias) */
   partial?: boolean;
+  /** explicação do que a etapa realmente mede (tooltip) */
+  hint?: string;
 }
 export interface MarketingFunnel {
   steps: FunnelStep[];

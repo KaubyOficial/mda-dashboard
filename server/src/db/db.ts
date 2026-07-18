@@ -12,5 +12,20 @@ export function openDb(path: string): Db {
   db.exec('PRAGMA journal_mode = WAL;');
   db.exec('PRAGMA foreign_keys = ON;');
   db.exec(SCHEMA_SQL);
+  migrate(db);
   return db;
+}
+
+/** Migrations idempotentes p/ bancos já existentes (CREATE TABLE IF NOT EXISTS não altera colunas). */
+function migrate(db: Db): void {
+  ensureColumn(db, 'midia_diaria', 'chegou_cadastro', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn(db, 'midia_anuncio', 'chegou_cadastro', 'INTEGER NOT NULL DEFAULT 0');
+}
+
+/** Adiciona a coluna se ainda não existir (checa PRAGMA table_info). */
+function ensureColumn(db: Db, table: string, column: string, decl: string): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
+  }
 }

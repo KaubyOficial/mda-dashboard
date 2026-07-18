@@ -148,6 +148,7 @@ function computeMarketingFunnel(
   const impressoes = sum(md.map((m) => m.impressoes));
   const cliques = sum(md.map((m) => m.cliques));
   const cliquesLP = sum(md.map((m) => m.cliquesBotaoLP));
+  const chegouCadastro = sum(md.map((m) => m.chegouCadastro));
   const formsIni = sum(md.map((m) => m.formsIniciados));
   const leads = enriched.filter((l) => isInRange(l.date, range)).length;
 
@@ -173,8 +174,36 @@ function computeMarketingFunnel(
   const steps = [
     { key: 'impressoes', label: 'Impressões', value: impressoes },
     { key: 'cliques', label: 'Cliques', value: cliques },
-    { key: 'cliqueLP', label: 'Clique botão LP', value: cliquesLP },
-    { key: 'formsIniciados', label: 'Início forms', value: formsIni, partial: iniParcial },
+    {
+      key: 'cliqueLP',
+      label: 'Visualizou a LP',
+      value: cliquesLP,
+      // Fonte real = Meta "Action Landing Page View" (agregado das ADS). Mede quem clicou no
+      // anúncio E a página de captura CARREGOU — chegou na LP. NÃO é clique num botão dentro da
+      // LP para ir ao formulário; por isso a queda até "Início forms" é grande e esperada.
+      hint:
+        'Meta "Landing Page View": o anúncio foi clicado e a página de captura carregou (a pessoa CHEGOU na LP). Não é clique num botão dentro da LP — por isso a queda até "Início forms" é grande e normal.',
+    },
+    // Clique no botão da VSL que leva ao /cadastro-monetizacao/ (etapa entre "chegou na LP" e o
+    // form). Só entra no funil se houver dado — 0 = não rastreado ainda, e mostrar "0" com taxa
+    // quebrada seria pior que omitir. Ver docs/data-dictionary.md e a recomendação de coluna.
+    ...(chegouCadastro > 0
+      ? [
+          {
+            key: 'chegouCadastro',
+            label: 'Clicou no botão',
+            value: chegouCadastro,
+            hint: 'Cliques no botão da VSL ("QUERO ACELERAR…") que levam à página de cadastro (/cadastro-monetizacao/). É a etapa entre chegar na LP e começar o formulário.',
+          },
+        ]
+      : []),
+    {
+      key: 'formsIniciados',
+      label: 'Início forms',
+      value: formsIni,
+      partial: iniParcial,
+      hint: 'Campo "IniciouForms" da aba ACOMPANHAMENTO DIÁRIO (clicou "QUERO ACESSAR" no disclaimer → o formulário começa de fato). Preenchido à mão e só rastreado desde 2026-03-18, então no histórico completo fica subcontado.',
+    },
     { key: 'leads', label: 'Leads', value: leads },
   ];
   // taxa de/para uma etapa parcial é incomparável — melhor null do que um número que sabemos errado

@@ -64,7 +64,12 @@
 `0 Data · 1 Gasto · 2 Leads · 3 Cliques no Link · 4 Alcance · 5 Impressões · 6 VPG · 7 IniciouForms · 8 MQL · 9 Morno`.
 - `MidiaDiaria`: investimento=Gasto, cliques=Cliques no Link, impressoes, alcance, formsIniciados=IniciouForms, formsFinalizados=Leads.
 - LP-view e VSL-play (funil de mkt) vêm agregados por dia da aba MÉTRICAS ADS.
+- ⚠️ **VPG ≈ Landing Page View** (36.858 ≈ 37.293, 98,8%). VPG é o nome que a planilha dá a "visualizou a LP" — a MESMA coisa que o LP View das ADS, **não** o clique no botão. Por isso o dashboard usa o LP View (ADS) para "Visualizou a LP" e não duplica com VPG.
+- **Coluna OPCIONAL `Cliques no Botão` (`chegouCadastro`)** — cliques no botão da VSL (`/monetizacao-vsl/` → `/cadastro-monetizacao/`), a etapa ENTRE "chegou na LP" e "começou o formulário". Aliases aceitos: `Cliques no Botão`/`Botão LP`/`Chegou Cadastro`/`Cadastro`/`Clicou no Botão`. Se a coluna não existir, fica 0 e a etapa **some** do funil (não vira degrau falso). Também pode vir como custom conversion na MÉTRICAS ADS (`Chegou Cadastro`), agregada por dia — a coluna manual do dia vence.
 - **Reconciliação:** Σ Gasto = **R$ 63.021,88** (exato).
+
+### Funil de marketing — mapeamento das 2 páginas da LP (confirmado com o Kauê, 2026-07-17)
+`/monetizacao-vsl/` (VSL) **carregou** = "Visualizou a LP" (Landing Page View / VPG) → clicou "QUERO ACELERAR" e foi pro `/cadastro-monetizacao/` (disclaimer) = **"Clicou no botão"** (`chegouCadastro`, opcional) → clicou "QUERO ACESSAR" e o form começou = "Início forms" (IniciouForms, desde 2026-03-18) → enviou o form = **Lead**.
 
 ## MÉTRICAS ADS (por anúncio) — traz leads e MQL próprios
 

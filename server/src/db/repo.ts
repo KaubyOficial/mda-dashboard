@@ -53,11 +53,11 @@ export function writeSnapshot(db: Db, snap: DataSnapshot): void {
     for (const v of snap.vendas) insV.run(v.id, v.date, v.emailKey, v.phoneKey, v.nameKey, v.valorBRL);
 
     const insMd = db.prepare(
-      `INSERT OR REPLACE INTO midia_diaria (date,investimento_brl,impressoes,alcance,cliques,cliques_botao_lp,vsl_plays,forms_iniciados,forms_finalizados)
-       VALUES (?,?,?,?,?,?,?,?,?)`,
+      `INSERT OR REPLACE INTO midia_diaria (date,investimento_brl,impressoes,alcance,cliques,cliques_botao_lp,vsl_plays,chegou_cadastro,forms_iniciados,forms_finalizados)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
     );
     for (const m of snap.midiaDiaria) {
-      insMd.run(m.date, m.investimentoBRL, m.impressoes, m.alcance, m.cliques, m.cliquesBotaoLP, m.vslPlays, m.formsIniciados, m.formsFinalizados);
+      insMd.run(m.date, m.investimentoBRL, m.impressoes, m.alcance, m.cliques, m.cliquesBotaoLP, m.vslPlays, m.chegouCadastro, m.formsIniciados, m.formsFinalizados);
     }
 
     const insMp = db.prepare(
@@ -66,10 +66,10 @@ export function writeSnapshot(db: Db, snap: DataSnapshot): void {
     for (const m of snap.midiaPublico) insMp.run(m.date, m.publico, m.investimentoBRL, m.impressoes, m.cliques, m.leads);
 
     const insMa = db.prepare(
-      `INSERT OR REPLACE INTO midia_anuncio (date,anuncio,investimento_brl,impressoes,cliques,lp_views,vsl_plays,leads,mqls) VALUES (?,?,?,?,?,?,?,?,?)`,
+      `INSERT OR REPLACE INTO midia_anuncio (date,anuncio,investimento_brl,impressoes,cliques,lp_views,vsl_plays,chegou_cadastro,leads,mqls) VALUES (?,?,?,?,?,?,?,?,?,?)`,
     );
     for (const m of snap.midiaAnuncio)
-      insMa.run(m.date, m.anuncio, m.investimentoBRL, m.impressoes, m.cliques, m.lpViews, m.vslPlays, m.leads, m.mqls);
+      insMa.run(m.date, m.anuncio, m.investimentoBRL, m.impressoes, m.cliques, m.lpViews, m.vslPlays, m.chegouCadastro, m.leads, m.mqls);
 
     db.exec('COMMIT');
   } catch (e) {
@@ -135,6 +135,7 @@ export function readSnapshot(db: Db): DataSnapshot {
       cliques: n(r.cliques),
       cliquesBotaoLP: n(r.cliques_botao_lp),
       vslPlays: n(r.vsl_plays),
+      chegouCadastro: n(r.chegou_cadastro),
       formsIniciados: n(r.forms_iniciados),
       formsFinalizados: n(r.forms_finalizados),
     }),
@@ -158,6 +159,7 @@ export function readSnapshot(db: Db): DataSnapshot {
       cliques: n(r.cliques),
       lpViews: n(r.lp_views),
       vslPlays: n(r.vsl_plays),
+      chegouCadastro: n(r.chegou_cadastro),
       leads: n(r.leads),
       mqls: n(r.mqls),
     }),

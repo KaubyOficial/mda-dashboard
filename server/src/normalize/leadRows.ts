@@ -163,6 +163,82 @@ export function parseVendaRows(rows: string[][], warnings: string[]): Venda[] {
     });
   }
   if (iValor === undefined) warnings.push('VENDAS: coluna Valor não encontrada — faturamento = 0.');
+  return dedupeSplitPayments(out, warnings);
+}
+
+/** Janela p/ tratar 2+ vendas do mesmo cliente como pagamento dividido/parcelado (em dias). */
+const SPLIT_WINDOW_DAYS = 60;
+
+function daysApart(a: string, b: string): number {
+  return Math.abs(Date.parse(a) - Date.parse(b)) / 86_400_000;
+}
+
+/**
+ * Une pagamentos divididos: o MESMO cliente (mesmo e-mail) aparecendo em 2+ linhas de VENDA
+ * próximas no tempo é UMA venda paga em partes (ex.: metade cartão / metade pix, ou parcelas),
+ * não vendas separadas. Soma os valores e mantém a data da 1ª parte. Sem isso a contagem de
+ * vendas e o ticket médio ficam inflados.
+ *
+ * Regra de segurança: linhas SEM e-mail NUNCA são unidas — a aba VENDAS traz só o primeiro nome
+ * em muitos casos (Lucas, Rafael, Daniel…) e primeiros nomes iguais são pessoas diferentes, cada
+ * uma com ticket cheio. O e-mail é a única chave de identidade confiável. Vendas do mesmo e-mail
+ * distantes (> janela) ficam separadas (recompra/renovação) e viram aviso para conferência.
+ */
+export function dedupeSplitPayments(vendas: Venda[], warnings: string[]): Venda[] {
+  const byEmail = new Map<string, Venda[]>();
+  const out: Venda[] = [];
+  for (const v of vendas) {
+    if (!v.emailKey) {
+      out.push(v); // sem e-mail: identidade não comprovável → nunca une
+      continue;
+    }
+    const arr = byEmail.get(v.emailKey);
+    if (arr) arr.push(v);
+    else byEmail.set(v.emailKey, [v]);
+  }
+
+  const merges: string[] = [];
+  let farApart = 0;
+  for (const rows of byEmail.values()) {
+    if (rows.length === 1) {
+      out.push(rows[0]!);
+      continue;
+    }
+    rows.sort((a, b) => a.date.localeCompare(b.date));
+    let run: Venda[] = [rows[0]!];
+    const flush = () => {
+      if (run.length === 1) {
+        out.push(run[0]!);
+        return;
+      }
+      const first = run[0]!;
+      const valor = run.reduce((s, x) => s + x.valorBRL, 0);
+      out.push({ ...first, valorBRL: valor }); // mantém id/chaves/data da 1ª parte, soma o valor
+      merges.push(`${first.nameKey || first.emailKey} (${run.length}× = R$ ${valor.toFixed(2)})`);
+    };
+    for (let i = 1; i < rows.length; i++) {
+      if (daysApart(rows[i]!.date, run[run.length - 1]!.date) <= SPLIT_WINDOW_DAYS) {
+        run.push(rows[i]!);
+      } else {
+        farApart++;
+        flush();
+        run = [rows[i]!];
+      }
+    }
+    flush();
+  }
+  out.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+
+  if (merges.length > 0) {
+    warnings.push(
+      `VENDAS: ${merges.length} venda(s) estavam divididas em 2+ linhas (mesmo cliente, pagamento em partes) e foram unidas numa venda só: ${merges.join('; ')}.`,
+    );
+  }
+  if (farApart > 0) {
+    warnings.push(
+      `VENDAS: ${farApart} caso(s) de mesmo e-mail com compras a mais de ${SPLIT_WINDOW_DAYS} dias — mantidas como vendas SEPARADAS (possível recompra). Conferir se não é parcela atrasada.`,
+    );
+  }
   return out;
 }
 
@@ -178,6 +254,22 @@ export function parseMidiaDiariaRows(rows: string[][]): MidiaDiaria[] {
   const iAlc = col('Alcance');
   const iImp = col('Impressões');
   const iFi = col('IniciouForms', 'Forms Iniciados', 'Início Forms');
+  // Cliques no botão da VSL que levam ao /cadastro-monetizacao/ (etapa entre "chegou na LP" e
+  // "começou o form"). Coluna opcional — aceita vários nomes; se não existir fica 0 e a etapa
+  // some do funil. Também pode vir da aba MÉTRICAS ADS (custom conversion) via mergeAdsIntoDiaria.
+  const iCad = col(
+    'Cliques no Botão',
+    'Cliques Botão',
+    'Clique no Botão',
+    'Clique Botão',
+    'Botão LP',
+    'Botao LP',
+    'Chegou Cadastro',
+    'Chegou no Cadastro',
+    'Cadastro',
+    'Foi pro Cadastro',
+    'Clicou no Botão',
+  );
   const out: MidiaDiaria[] = [];
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r]!;
@@ -191,6 +283,7 @@ export function parseMidiaDiariaRows(rows: string[][]): MidiaDiaria[] {
       cliques: parseInt0(get(row, iClq)),
       cliquesBotaoLP: 0, // preenchido do agregado de MÉTRICAS ADS
       vslPlays: 0, // idem
+      chegouCadastro: iCad === undefined ? 0 : parseInt0(get(row, iCad)),
       formsIniciados: parseInt0(get(row, iFi)),
       formsFinalizados: parseInt0(get(row, iLeads)),
     });
@@ -211,6 +304,15 @@ export function parseMidiaAnuncioRows(rows: string[][]): MidiaAnuncio[] {
   const iClq = col('Inline Link Clicks', 'Cliques', 'Link Clicks');
   const iLp = col('Action Landing Page View', 'Landing Page View', 'LP View');
   const iVsl = col('Action 3s Video Views', '3s Video Views', 'Video Views');
+  // Custom conversion opcional p/ cliques no botão da VSL → página de cadastro (etapa entre LP e form).
+  const iCad = col(
+    'Action Chegou Cadastro',
+    'Chegou Cadastro',
+    'Cliques no Botão',
+    'Clique Botão',
+    'Botão LP',
+    'Cadastro',
+  );
   const iMql = col('MQL');
   const out: MidiaAnuncio[] = [];
   for (let r = 1; r < rows.length; r++) {
@@ -226,6 +328,7 @@ export function parseMidiaAnuncioRows(rows: string[][]): MidiaAnuncio[] {
       cliques: parseInt0(get(row, iClq)),
       lpViews: parseInt0(get(row, iLp)),
       vslPlays: parseInt0(get(row, iVsl)),
+      chegouCadastro: iCad === undefined ? 0 : parseInt0(get(row, iCad)),
       leads: parseInt0(get(row, iLeads)),
       mqls: parseInt0(get(row, iMql)),
     });
@@ -265,12 +368,17 @@ export function parseMidiaPublicoRows(rows: string[][]): MidiaPublico[] {
 export function mergeAdsIntoDiaria(diaria: MidiaDiaria[], anuncios: MidiaAnuncio[]): void {
   const lpByDay = new Map<string, number>();
   const vslByDay = new Map<string, number>();
+  const cadByDay = new Map<string, number>();
   for (const a of anuncios) {
     lpByDay.set(a.date, (lpByDay.get(a.date) ?? 0) + a.lpViews);
     vslByDay.set(a.date, (vslByDay.get(a.date) ?? 0) + a.vslPlays);
+    cadByDay.set(a.date, (cadByDay.get(a.date) ?? 0) + a.chegouCadastro);
   }
   for (const d of diaria) {
     d.cliquesBotaoLP = lpByDay.get(d.date) ?? 0;
     d.vslPlays = vslByDay.get(d.date) ?? 0;
+    // "chegou no cadastro" pode vir da coluna manual (ACOMPANHAMENTO) ou do custom conversion (ADS).
+    // A manual do dia vence se já veio preenchida; senão usa o agregado das ADS.
+    if (d.chegouCadastro === 0) d.chegouCadastro = cadByDay.get(d.date) ?? 0;
   }
 }

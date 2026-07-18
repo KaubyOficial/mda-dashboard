@@ -52,6 +52,8 @@ export interface FunnelStep {
    * Quando true, nem a taxa dela nem a da etapa seguinte são comparáveis — a UI mostra "—".
    */
   partial?: boolean;
+  /** Explicação do que a etapa realmente mede (tooltip na UI) — quando o rótulo pode enganar. */
+  hint?: string;
 }
 
 export interface MarketingFunnel {

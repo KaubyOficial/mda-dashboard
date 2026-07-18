@@ -55,8 +55,9 @@ export function FunnelShape({
           <div key={s.key} className="flex items-center gap-3" style={{ marginBottom: i < steps.length - 1 ? GAP : 0 }}>
             {/* etapa */}
             <div className="w-28 shrink-0 text-right sm:w-36">
-              <div className="truncate text-xs text-muted" title={s.label}>
+              <div className="truncate text-xs text-muted" title={s.hint ?? s.label}>
                 {s.label}
+                {s.hint ? <span className="ml-0.5 cursor-help text-gold/70">*</span> : null}
               </div>
             </div>
 

@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS midia_diaria (
   cliques           INTEGER NOT NULL DEFAULT 0,
   cliques_botao_lp  INTEGER NOT NULL DEFAULT 0,
   vsl_plays         INTEGER NOT NULL DEFAULT 0,
+  chegou_cadastro   INTEGER NOT NULL DEFAULT 0,
   forms_iniciados   INTEGER NOT NULL DEFAULT 0,
   forms_finalizados INTEGER NOT NULL DEFAULT 0
 );
@@ -61,6 +62,7 @@ CREATE TABLE IF NOT EXISTS midia_anuncio (
   date TEXT NOT NULL, anuncio TEXT NOT NULL,
   investimento_brl REAL NOT NULL DEFAULT 0, impressoes INTEGER NOT NULL DEFAULT 0, cliques INTEGER NOT NULL DEFAULT 0,
   lp_views INTEGER NOT NULL DEFAULT 0, vsl_plays INTEGER NOT NULL DEFAULT 0,
+  chegou_cadastro INTEGER NOT NULL DEFAULT 0,
   leads INTEGER NOT NULL DEFAULT 0, mqls INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (date, anuncio)
 );

@@ -76,7 +76,9 @@ export class MockSource implements DataSource {
       const cliques = Math.round(impressoes * (0.01 + this.rnd() * 0.02));
       const cliquesBotaoLP = Math.round(cliques * (0.4 + this.rnd() * 0.2));
       const vslPlays = Math.round(cliquesBotaoLP * (0.6 + this.rnd() * 0.2));
-      const formsIniciados = Math.round(vslPlays * (0.5 + this.rnd() * 0.2));
+      // clique no botão da VSL → cadastro: entre "chegou na LP" e "começou o form"
+      const chegouCadastro = Math.round(cliquesBotaoLP * (0.15 + this.rnd() * 0.1));
+      const formsIniciados = Math.round(chegouCadastro * (0.6 + this.rnd() * 0.2));
       const formsFinalizados = Math.max(leadsToday, Math.round(formsIniciados * 0.8));
 
       midiaDiaria.push({
@@ -87,6 +89,7 @@ export class MockSource implements DataSource {
         cliques,
         cliquesBotaoLP,
         vslPlays,
+        chegouCadastro,
         formsIniciados,
         formsFinalizados,
       });
@@ -123,6 +126,7 @@ export class MockSource implements DataSource {
           cliques: adClq,
           lpViews: Math.round(adClq * 0.5),
           vslPlays: Math.round(adClq * 0.3),
+          chegouCadastro: Math.round(adClq * 0.08),
           leads: adLeads,
           mqls: Math.round(adLeads * 0.1),
         });

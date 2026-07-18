@@ -7,6 +7,12 @@ import { previousRange, validateRange, RangeError, daysInclusive } from '../src/
 import { enrichLeads } from '../src/crossjoin/match.js';
 import { adCode, publicoSlug } from '../src/crossjoin/attribution.js';
 import { mapOrigem, mapTemperatura, type UtmMap } from '../src/normalize/utm.js';
+import {
+  parseVendaRows,
+  parseMidiaDiariaRows,
+  parseMidiaAnuncioRows,
+  mergeAdsIntoDiaria,
+} from '../src/normalize/leadRows.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -145,4 +151,86 @@ test('publicoSlug — casa utm_medium do lead com o nome do público da aba', ()
   );
   assert.equal(publicoSlug('00 - Aberto | H | 22 - 44'), 'aberto-h-22-44');
   assert.equal(publicoSlug('(sem público)'), 'sem-publico');
+});
+
+test('parseVendaRows — une pagamento dividido (mesmo e-mail) e NÃO une nomes iguais sem e-mail', () => {
+  const header = ['Data', 'Status', 'Nome', 'E-mail', 'Valor'];
+  const rows = [
+    header,
+    // 1 venda paga em partes no mesmo dia (metade cartão / metade pix) → deve virar UMA (4202.35)
+    ['16/06/2026', 'VENDA REALIZADA', 'João Paulo', 'joaopaulo@gmail.com', '2497,51'],
+    ['16/06/2026', 'VENDA REALIZADA', 'João Paulo', 'joaopaulo@gmail.com', '1704,84'],
+    // 1 venda em 2 parcelas, 16 dias de distância (dentro da janela) → UMA (4292.02)
+    ['20/04/2026', 'VENDA REALIZADA', 'Gustavo', 'gustavo@gmail.com', '2146,01'],
+    ['06/05/2026', 'VENDA REALIZADA', 'Gustavo', 'gustavo@gmail.com', '2146,01'],
+    // 2 pessoas DIFERENTES de mesmo primeiro nome, SEM e-mail, ticket cheio → NÃO une (2 vendas)
+    ['16/07/2025', 'VENDA REALIZADA', 'Rafael', '', '4297,00'],
+    ['14/08/2025', 'VENDA REALIZADA', 'Rafael', '', '4297,00'],
+    // linha ignorada (status diferente)
+    ['01/01/2026', 'CANCELADA', 'Fulano', 'fulano@gmail.com', '4297,00'],
+  ];
+  const warnings: string[] = [];
+  const vendas = parseVendaRows(rows, warnings);
+  // 2 (João Paulo + Gustavo unidos) + 2 (Rafaéis separados) = 4 vendas; CANCELADA fora
+  assert.equal(vendas.length, 4);
+  const byEmail = (e: string) => vendas.find((v) => v.emailKey === e)!;
+  assert.equal(Math.round(byEmail('joaopaulo@gmail.com').valorBRL * 100), 420235);
+  assert.equal(Math.round(byEmail('gustavo@gmail.com').valorBRL * 100), 429202);
+  // os 2 Rafaéis sem e-mail seguem separados, ticket cheio cada
+  const rafaeis = vendas.filter((v) => v.emailKey === '' && v.nameKey === 'rafael');
+  assert.equal(rafaeis.length, 2);
+  assert.ok(rafaeis.every((v) => v.valorBRL === 4297));
+  // faturamento total preservado (soma não muda ao unir): 4202.35+4292.02+4297+4297
+  const total = vendas.reduce((s, v) => s + v.valorBRL, 0);
+  assert.equal(Math.round(total * 100), 420235 + 429202 + 429700 + 429700);
+  assert.ok(warnings.some((w) => w.includes('divididas em 2+ linhas')));
+});
+
+test('chegouCadastro — lê a coluna manual do ACOMPANHAMENTO DIÁRIO (clique no botão da LP)', () => {
+  const rows = [
+    ['Data', 'Gasto', 'Leads', 'Cliques no Link', 'Impressões', 'VPG', 'Cliques no Botão', 'IniciouForms'],
+    ['01/03/2026', '100', '12', '100', '1000', '40', '18', '15'],
+  ];
+  const md = parseMidiaDiariaRows(rows);
+  assert.equal(md[0]!.chegouCadastro, 18);
+  assert.equal(md[0]!.formsIniciados, 15);
+});
+
+test('chegouCadastro — coluna ausente = 0 (etapa fica escondida, não quebra)', () => {
+  const rows = [
+    ['Data', 'Gasto', 'Leads', 'Cliques no Link', 'Impressões', 'IniciouForms'],
+    ['01/03/2026', '100', '12', '100', '1000', '15'],
+  ];
+  assert.equal(parseMidiaDiariaRows(rows)[0]!.chegouCadastro, 0);
+});
+
+test('chegouCadastro — vem do custom conversion das MÉTRICAS ADS quando o diário está 0', () => {
+  const diaria = parseMidiaDiariaRows([
+    ['Data', 'Gasto', 'Leads', 'Impressões', 'IniciouForms'],
+    ['01/03/2026', '100', '12', '1000', '15'],
+  ]);
+  assert.equal(diaria[0]!.chegouCadastro, 0); // sem coluna no diário
+  const ads = parseMidiaAnuncioRows(
+    [
+      ['date', 'Ad Name', 'Spend', 'Action Leads', 'Impressions', 'Action Landing Page View', 'Chegou Cadastro'],
+      ['2026-03-01', 'AD1', '50', '6', '500', '30', '7'],
+      ['2026-03-01', 'AD2', '50', '6', '500', '25', '5'],
+    ],
+    [],
+  );
+  mergeAdsIntoDiaria(diaria, ads);
+  assert.equal(diaria[0]!.chegouCadastro, 12); // 7 + 5 agregados por dia
+});
+
+test('parseVendaRows — mesmo e-mail distante (> janela) fica separado + avisa recompra', () => {
+  const header = ['Data', 'Status', 'Nome', 'E-mail', 'Valor'];
+  const rows = [
+    header,
+    ['01/01/2025', 'VENDA REALIZADA', 'Maria', 'maria@x.com', '4297,00'],
+    ['01/10/2025', 'VENDA REALIZADA', 'Maria', 'maria@x.com', '4297,00'], // 9 meses depois
+  ];
+  const warnings: string[] = [];
+  const vendas = parseVendaRows(rows, warnings);
+  assert.equal(vendas.length, 2); // recompra: NÃO une
+  assert.ok(warnings.some((w) => w.includes('mais de 60 dias')));
 });

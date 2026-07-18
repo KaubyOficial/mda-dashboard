@@ -36,8 +36,8 @@ export function fixture(): DataSnapshot {
     ],
     // mqls aqui = coluna MQL da MÉTRICAS ADS, subcontada no dado real (por isso a atribuição vem da LEADS)
     midiaAnuncio: [
-      { date: '2026-03-01', anuncio: 'AD1 [OCDM] [VID] CAPTAÇÃO', investimentoBRL: 200, impressoes: 2000, cliques: 150, lpViews: 60, vslPlays: 30, leads: 3, mqls: 0 },
-      { date: '2026-03-02', anuncio: 'AD2 [OCDM] [VID] CAPTAÇÃO', investimentoBRL: 200, impressoes: 2000, cliques: 150, lpViews: 40, vslPlays: 20, leads: 2, mqls: 1 },
+      { date: '2026-03-01', anuncio: 'AD1 [OCDM] [VID] CAPTAÇÃO', investimentoBRL: 200, impressoes: 2000, cliques: 150, lpViews: 60, vslPlays: 30, chegouCadastro: 0, leads: 3, mqls: 0 },
+      { date: '2026-03-02', anuncio: 'AD2 [OCDM] [VID] CAPTAÇÃO', investimentoBRL: 200, impressoes: 2000, cliques: 150, lpViews: 40, vslPlays: 20, chegouCadastro: 0, leads: 2, mqls: 1 },
     ],
     warnings: [],
   };
@@ -96,6 +96,7 @@ function md(
   vslPlays: number,
   formsIniciados: number,
   formsFinalizados: number,
+  chegouCadastro = 0,
 ): DataSnapshot['midiaDiaria'][number] {
   return {
     date,
@@ -105,6 +106,7 @@ function md(
     cliques,
     cliquesBotaoLP,
     vslPlays,
+    chegouCadastro,
     formsIniciados,
     formsFinalizados,
   };

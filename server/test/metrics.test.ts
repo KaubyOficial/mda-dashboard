@@ -112,6 +112,26 @@ test('funil de marketing — com rastreio completo, taxas normais e nada de "par
   assert.ok(!r.meta.warnings.some((w) => /Início forms/.test(w)));
 });
 
+test('funil de marketing — etapa "Clicou no botão" entra ENTRE "Visualizou a LP" e "Início forms" quando há dado', () => {
+  const f = fixture();
+  // chegouCadastro: 03-01=20, 03-02=40 → total 60 (entre cliqueLP 120 e formsIni 45)
+  f.midiaDiaria = f.midiaDiaria.map((m) => ({ ...m, chegouCadastro: m.date === '2026-03-01' ? 20 : 40 }));
+  const mf = computeMetrics(f, MARCO, META).marketingFunnel;
+  const keys = mf.steps.map((s) => s.key);
+  assert.deepEqual(keys, ['impressoes', 'cliques', 'cliqueLP', 'chegouCadastro', 'formsIniciados', 'leads']);
+  const byKey = Object.fromEntries(mf.steps.map((s) => [s.key, s]));
+  assert.equal(byKey.chegouCadastro!.value, 60);
+  near(byKey.chegouCadastro!.rateFromPrev, 60 / 120); // vs Visualizou a LP
+  near(byKey.formsIniciados!.rateFromPrev, 45 / 60); // agora encadeia no botão, não na LP
+});
+
+test('funil de marketing — etapa "Clicou no botão" some quando não há dado (não mostra degrau 0)', () => {
+  const mf = computeMetrics(fixture(), MARCO, META).marketingFunnel; // fixture: chegouCadastro=0
+  assert.equal(mf.steps.find((s) => s.key === 'chegouCadastro'), undefined);
+  const byKey = Object.fromEntries(mf.steps.map((s) => [s.key, s]));
+  near(byKey.formsIniciados!.rateFromPrev, 45 / 120); // encadeia direto na LP
+});
+
 test('funil de marketing — sem etapa de Play VSL; início de forms encadeia no clique da LP', () => {
   const mf = computeMetrics(fixture(), MARCO, META).marketingFunnel;
   assert.equal(

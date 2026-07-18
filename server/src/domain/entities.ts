@@ -61,9 +61,13 @@ export interface MidiaDiaria {
   impressoes: number;
   alcance: number;
   cliques: number; // Cliques no Link
-  cliquesBotaoLP: number; // Action Landing Page View (agregado das ADS por dia)
+  cliquesBotaoLP: number; // Action Landing Page View (agregado das ADS por dia) = "chegou na LP"
   vslPlays: number; // Action 3s Video Views (agregado das ADS por dia)
-  formsIniciados: number; // IniciouForms
+  // Cliques no botão da VSL que levam à página de cadastro (/cadastro-monetizacao/) — a etapa
+  // ENTRE "chegou na LP" e "começou o formulário". Meta/planilha ainda podem não trazer: 0 = não
+  // rastreado (a etapa some do funil em vez de mostrar um degrau falso). Ver docs/data-dictionary.md.
+  chegouCadastro: number;
+  formsIniciados: number; // IniciouForms (clicou "QUERO ACESSAR" no disclaimer → form começa)
   formsFinalizados: number; // Leads (contagem de mídia do dia)
 }
 
@@ -86,6 +90,7 @@ export interface MidiaAnuncio {
   cliques: number; // Inline Link Clicks
   lpViews: number; // Action Landing Page View
   vslPlays: number; // Action 3s Video Views
+  chegouCadastro: number; // custom conversion "chegou no cadastro" (0 se a coluna não existir)
   leads: number; // Action Leads
   mqls: number; // MQL (col da aba)
 }
