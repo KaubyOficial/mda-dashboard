@@ -1,4 +1,4 @@
-# Runbook — Dashboard MDA (Story 7.4)
+﻿# Runbook — Dashboard MDA (Story 7.4)
 
 ## Rodar em dev (local)
 
@@ -11,7 +11,7 @@ cp .env.example .env          # DATA_SOURCE=mock por padrão
 npm run dev --workspace server
 
 # terminal 2 — web com hot reload (proxy → :8080)
-npm run dev:web --workspace web        # http://localhost:5173
+npm run dev:web --workspace web        # http://localhost:5278
 ```
 
 Modos de fonte (`DATA_SOURCE` no `.env`):

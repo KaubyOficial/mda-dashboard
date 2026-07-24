@@ -1,0 +1,12 @@
+<!-- Matches the desktop launcher icon (scripts/launchers/icons/mda-dashboard.ico).
+     House style: rounded square, diagonal gradient, white mark. Mark = funnel. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ec4899"/>
+      <stop offset="1" stop-color="#f43f5e"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="url(#g)"/>
+  <polygon points="7.5,8.5 24.5,8.5 17.8,16.5 17.8,23.5 14.2,21 14.2,16.5" fill="#fff"/>
+</svg>

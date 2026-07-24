@@ -1,4 +1,4 @@
-# Dashboard da Mentoria MDA
+﻿# Dashboard da Mentoria MDA
 
 Dashboard web de página única com todos os números do funil high-ticket do Caio: faturamento, investimento, lucro, leads, funil de marketing, funil comercial, segmentação MQL/Morno/Fora, relatórios por público e por anúncio — lidos de uma planilha Google Sheets, com filtro de período, comparação com período anterior e acesso protegido por SSO Google (Cloudflare Access).
 
@@ -14,7 +14,7 @@ Dois terminais, a partir da raiz do projeto:
 npm install
 cp .env.example .env      # o server lê este arquivo no boot; ajuste DATA_SOURCE (ver tabela abaixo)
 npm run dev               # terminal 1 — API em :8080 (sync inicial só se o cache estiver vazio)
-npm run dev:web           # terminal 2 — UI em :5173 (é a URL que se abre; faz proxy do /api pra :8080)
+npm run dev:web           # terminal 2 — UI em :5278 (é a URL que se abre; faz proxy do /api pra :8080)
 ```
 Vars setadas no shell vencem as do `.env`, então dá pra sobrepor pontualmente:
 `DATA_SOURCE=mock npm run dev` (bash) · `$env:DATA_SOURCE="mock"; npm run dev` (PowerShell).
