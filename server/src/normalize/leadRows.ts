@@ -75,6 +75,7 @@ export function parseLeadRows(rows: string[][], utmMap: UtmMap, warnings: string
     };
     const labelFromSheet = normalizeQualLabel(get(row, iMql));
     const byAnswers = classifyByAnswers(get(row, iCapital), get(row, iConhece));
+    const pagoOrganico = mapPagoOrganico(utm, get(row, iOrgPago), utmMap);
     const lead: Lead = {
       id: makeLeadId(emailKey, phoneKey, date, nameKey),
       date,
@@ -82,9 +83,9 @@ export function parseLeadRows(rows: string[][], utmMap: UtmMap, warnings: string
       phoneKey,
       nameKey,
       qualificacao: labelFromSheet ?? byAnswers.qualificacao,
-      temperatura: mapTemperatura(utm, utmMap),
+      temperatura: mapTemperatura(pagoOrganico),
       origem: mapOrigem(utm, utmMap),
-      pagoOrganico: mapPagoOrganico(utm, get(row, iOrgPago), utmMap),
+      pagoOrganico,
       utm,
       rendaBRL: byAnswers.rendaBRL,
       conhecePlusSemana: byAnswers.conhecePlusSemana,

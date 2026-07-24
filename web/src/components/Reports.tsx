@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { AnuncioRow, PublicoRow } from '../types';
+import type { AnuncioRow, OrigemOrganicaRow, PublicoRow } from '../types';
 import { fmtCurrency, fmtNumber, fmtRate } from '../format';
 import { EmptyHint, Section } from './states';
 
@@ -26,15 +26,17 @@ function SortableTable<T>({
   cols,
   firstLabel,
   firstField,
+  empty = 'Sem dados de mídia neste modo (GAP — ver avisos).',
 }: {
   rows: T[];
   cols: Col<T>[];
   firstLabel: string;
   firstField: keyof T & string;
+  empty?: string;
 }) {
   const [sortKey, setSortKey] = useState<keyof T | null>(null);
   const [dir, setDir] = useState<1 | -1>(-1);
-  if (rows.length === 0) return <EmptyHint>Sem dados de mídia neste modo (GAP — ver avisos).</EmptyHint>;
+  if (rows.length === 0) return <EmptyHint>{empty}</EmptyHint>;
   const sorted = sortKey
     ? [...rows].sort((a, b) => {
         const ca = cols.find((c) => c.key === sortKey)!;
@@ -106,6 +108,38 @@ export function ReportPublico({ rows }: { rows: PublicoRow[] }) {
     <Section title="Relatório por público" subtitle={rowsHint(rows.length, 'público', 'públicos')}>
       <div className="card">
         <SortableTable rows={rows} cols={cols} firstLabel="Público" firstField="publico" />
+      </div>
+    </Section>
+  );
+}
+
+/**
+ * De onde vêm os leads ORGÂNICOS — o espelho do relatório por anúncio, que só cobre o pago.
+ * O rótulo é o canal canônico ("Link da bio" unifica link_in_bio/BioOrganico/biografia — era
+ * tudo a mesma coisa em 3 linhas); UTM desconhecida mantém o rótulo cru pra denunciar canal novo.
+ */
+export function ReportOrganico({ rows }: { rows: OrigemOrganicaRow[] }) {
+  const cols: Col<OrigemOrganicaRow>[] = [
+    { key: 'leads', label: 'Leads', render: (r) => fmtNumber(r.leads), num: (r) => r.leads },
+    { key: 'mornos', label: 'Mornos', render: (r) => (r.mornos ? fmtNumber(r.mornos) : '—'), num: (r) => r.mornos },
+    { key: 'mqls', label: 'MQLs', render: (r) => (r.mqls ? fmtNumber(r.mqls) : '—'), num: (r) => r.mqls },
+    { key: 'agendamentos', label: 'Agendamentos', render: (r) => (r.agendamentos ? fmtNumber(r.agendamentos) : '—'), num: (r) => r.agendamentos },
+    { key: 'vendas', label: 'Vendas', render: (r) => (r.vendas ? fmtNumber(r.vendas) : '—'), num: (r) => r.vendas },
+    { key: 'conversaoTotal', label: 'Conv. lead→venda', render: (r) => fmtRate(r.conversaoTotal), num: (r) => r.conversaoTotal ?? -1 },
+  ];
+  return (
+    <Section
+      title="Origens do orgânico"
+      subtitle={`canal identificado pela UTM · ${rowsHint(rows.length, 'origem', 'origens')}`}
+    >
+      <div className="card">
+        <SortableTable
+          rows={rows}
+          cols={cols}
+          firstLabel="Origem"
+          firstField="origem"
+          empty="Nenhum lead orgânico no período."
+        />
       </div>
     </Section>
   );

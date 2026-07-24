@@ -45,7 +45,22 @@
 | 13 | ORGANICO OU PAGO? | pago vs orgânico (vence) | pago/organico |
 
 **Qualificação (total real):** Fora 3.875 · Morno 950 · MQL 356. O rótulo MQL só foi preenchido a partir de ~2026 (2025 quase todo Fora/Morno) — propriedade real da planilha, não bug.
-**Temperatura (via UTM):** quente 2.681 · frio 1.883 · morno 617. **Origem:** anúncio 4.059 · orgânico 1.060 (linhas de UTM em branco) · bio 52 · comercial 10.
+**Temperatura (regra 2026-07-24):** deriva do pago×orgânico — **pago = quente** (todo pago manda term quente) e **orgânico = morno** (quem veio organicamente é no mínimo morno); `frio` não é mais atribuída (as regras antigas por medium marcavam a maioria do orgânico como frio no chute). **Origem** (contagem histórica pré-correção): anúncio 4.059 · orgânico 1.060 (linhas de UTM em branco) · bio 52 · comercial 10.
+
+### Semântica das UTMs (confirmada pelo Kauê, 2026-07-24) — fonte do `config/utm-map.json`
+
+| Campo | Valor | Significa |
+|---|---|---|
+| utm_source | `FacebookADS` | tráfego **PAGO** |
+| utm_source | `ig` | Instagram **ORGÂNICO** (não é anúncio!) |
+| utm_medium | `social` | orgânico de rede social |
+| utm_medium | slug de público (ex. `caiu-captura-180d_vv-convite-50-30d`) | **público do PAGO** |
+| utm_term | `quente` | **PAGO** (todo pago manda `quente`) |
+| utm_term | outro (`frio`) | orgânico — o term **não mede temperatura** |
+| utm_content | `link_in_bio` | orgânico + de onde veio (link da bio) |
+| utm_content | `video-adX` | qual criativo do pago |
+
+Precedência do pago×orgânico no código (`mapPagoOrganico`): coluna `ORGANICO OU PAGO?` explícita (`pago`/`organico`) → regras da UTM em ordem (source primeiro, o sinal mais forte) → coluna com o utm_term cru do fluxo n8n novo (`quente`→pago, `frio`→orgânico) → default orgânico.
 
 ## AGENDAMENTOS & CALL
 

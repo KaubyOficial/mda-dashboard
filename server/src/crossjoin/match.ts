@@ -1,4 +1,4 @@
-import type { DataSnapshot, Lead, Venda } from '../domain/entities.js';
+import type { Agendamento, DataSnapshot, Lead, Venda } from '../domain/entities.js';
 
 /** Lead enriquecido com desfecho comercial casado (§2.4). */
 export interface EnrichedLead extends Lead {
@@ -19,6 +19,9 @@ export interface MatchReport {
 interface MatchResult {
   enriched: EnrichedLead[];
   unattributedVendas: Venda[];
+  /** cada agendamento/venda com o lead que casou (null = sem lead) — p/ recortes por atributo do lead. */
+  agendamentosComLead: { ag: Agendamento; lead: Lead | null }[];
+  vendasComLead: { venda: Venda; lead: Lead | null }[];
   report: MatchReport;
 }
 
@@ -61,8 +64,10 @@ export function enrichLeads(snap: DataSnapshot): MatchResult {
     enriched.set(l.id, { ...l, temAgendamento: false, compareceu: false, temVenda: false, valorVendaBRL: 0 });
   }
 
+  const agendamentosComLead: MatchResult['agendamentosComLead'] = [];
   for (const ag of snap.agendamentos) {
     const { lead } = findLead(ag, idx);
+    agendamentosComLead.push({ ag, lead: lead ?? null });
     if (!lead) continue;
     const e = enriched.get(lead.id)!;
     e.temAgendamento = true;
@@ -74,8 +79,10 @@ export function enrichLeads(snap: DataSnapshot): MatchResult {
   let byName = 0;
   let unmatched = 0;
   const unattributedVendas: Venda[] = [];
+  const vendasComLead: MatchResult['vendasComLead'] = [];
   for (const v of snap.vendas) {
     const { lead, via } = findLead(v, idx);
+    vendasComLead.push({ venda: v, lead: lead ?? null });
     if (!lead) {
       unmatched++;
       unattributedVendas.push(v);
@@ -92,6 +99,8 @@ export function enrichLeads(snap: DataSnapshot): MatchResult {
   return {
     enriched: [...enriched.values()],
     unattributedVendas,
+    agendamentosComLead,
+    vendasComLead,
     report: { byEmail, byPhone, byName, unmatched, totalVendas: snap.vendas.length },
   };
 }

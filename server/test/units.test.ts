@@ -6,8 +6,9 @@ import { classifyByAnswers, normalizeConhece } from '../src/normalize/qualificat
 import { previousRange, validateRange, RangeError, daysInclusive } from '../src/metrics/period.js';
 import { enrichLeads } from '../src/crossjoin/match.js';
 import { adCode, publicoSlug } from '../src/crossjoin/attribution.js';
-import { mapOrigem, mapTemperatura, type UtmMap } from '../src/normalize/utm.js';
+import { mapOrigem, mapPagoOrganico, mapTemperatura, type UtmMap } from '../src/normalize/utm.js';
 import {
+  parseLeadRows,
   parseVendaRows,
   parseMidiaDiariaRows,
   parseMidiaAnuncioRows,
@@ -21,12 +22,12 @@ import { fixture } from './fixtures.js';
 const utmMap = JSON.parse(
   readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../config/utm-map.json'), 'utf8'),
 ) as UtmMap;
-const utm = (source: string, medium: string, campaign = '') => ({
+const utm = (source: string, medium: string, campaign = '', content = '', term = '') => ({
   source,
   medium,
   campaign,
-  content: '',
-  term: '',
+  content,
+  term,
 });
 
 test('parseDateISO — BR e ISO', () => {
@@ -62,9 +63,14 @@ test('classifyByAnswers — regra simplificada travada', () => {
   assert.equal(normalizeConhece('6 meses'), true);
 });
 
-test('normalizePhone — casa com/sem 55 e formatação', () => {
-  assert.equal(normalizePhone('+55 (11) 99999-0001'), '11999990001');
-  assert.equal(normalizePhone('11999990001'), '11999990001');
+test('normalizePhone — casa com/sem 55, formatação E o nono dígito do celular', () => {
+  // as 3 grafias do MESMO número têm que virar a MESMA chave (achado real 2026-07-24:
+  // AGENDAMENTOS grava sem o 9, LEADS com o 9 → 13 agendamentos ficavam órfãos)
+  assert.equal(normalizePhone('+55 (11) 99999-0001'), '1199990001');
+  assert.equal(normalizePhone('11999990001'), '1199990001');
+  assert.equal(normalizePhone('1199990001'), '1199990001');
+  // fixo (10 dígitos sem 9 na 3ª posição) não é tocado
+  assert.equal(normalizePhone('1133334444'), '1133334444');
   assert.equal(normalizeEmail('  A@X.test '), 'a@x.test');
 });
 
@@ -93,15 +99,67 @@ test('previousRange — mês-atual (N dias corridos) e genérico', () => {
   assert.equal(daysInclusive({ from: '2026-03-10', to: '2026-03-12' }), 3);
 });
 
-test('utm-map real — field names casam com UtmSet (regressão: tudo virava frio)', () => {
-  // valores REAIS da aba LEADS
-  assert.equal(mapTemperatura(utm('FacebookADS', 'ig-visitou-7d'), utmMap), 'quente');
-  assert.equal(mapTemperatura(utm('FacebookADS', 'lookalike-1-lista-de-compradores-MDA'), utmMap), 'quente');
-  assert.equal(mapTemperatura(utm('FacebookADS', 'ig-envolvimento-7d'), utmMap), 'morno');
-  assert.equal(mapTemperatura(utm('ig', 'social'), utmMap), 'frio');
-  assert.equal(mapTemperatura(utm('FacebookADS', 'x', '23-04-26-OCDM-Q-AUTO-CAPTACAO-REMARKETING'), utmMap), 'quente');
+test('utm-map real — origem casa com os valores REAIS da aba LEADS', () => {
   assert.equal(mapOrigem(utm('FacebookADS', 'ig-visitou-7d'), utmMap), 'anuncio');
   assert.equal(mapOrigem(utm('BioOrganico', ''), utmMap), 'bio');
+});
+
+test('mapTemperatura — pago=quente, orgânico=morno (2026-07-24: term não mede temperatura)', () => {
+  assert.equal(mapTemperatura('pago'), 'quente');
+  assert.equal(mapTemperatura('organico'), 'morno');
+});
+
+test('parseLeadRows — temperatura deriva do pago/orgânico (pago 100% quente, orgânico no mínimo morno)', () => {
+  const header = ['Data', 'Nome', 'E-mail', 'CellPhone', 'OCDM_utm_source', 'OCDM_utm_medium', 'OCDM_utm_content', 'OCDM_utm_term', 'ORGANICO OU PAGO?'];
+  const rows = [
+    header,
+    // pago real: FacebookADS + público de remarketing + criativo + term quente
+    ['01/07/2026', 'Ana', 'a@x.test', '11999990001', 'FacebookADS', 'caiu-captura-180d_vv-convite-50-30d', 'video-ad02', 'quente', ''],
+    // orgânico real: ig + social + link da bio + term frio
+    ['01/07/2026', 'Bia', 'b@x.test', '11999990002', 'ig', 'social', 'link_in_bio', 'frio', ''],
+  ];
+  const leads = parseLeadRows(rows, utmMap, []);
+  const ana = leads.find((l) => l.emailKey === 'a@x.test')!;
+  const bia = leads.find((l) => l.emailKey === 'b@x.test')!;
+  assert.equal(ana.pagoOrganico, 'pago');
+  assert.equal(ana.temperatura, 'quente');
+  assert.equal(bia.pagoOrganico, 'organico');
+  assert.equal(bia.temperatura, 'morno'); // nunca mais 'frio' no chute
+});
+
+test('mapOrigem — semântica 2026-07-24: link_in_bio=bio, video-ad=anúncio, ig sozinho=orgânico', () => {
+  // content link_in_bio diz DE ONDE o orgânico veio (link da bio)
+  assert.equal(mapOrigem(utm('ig', 'social', '', 'link_in_bio'), utmMap), 'bio');
+  // content video-adX = criativo do pago, mesmo sem source
+  assert.equal(mapOrigem(utm('', '', '', 'video-ad07'), utmMap), 'anuncio');
+  // source ig SEM content de bio = Instagram orgânico genérico (não é mais 'anuncio')
+  assert.equal(mapOrigem(utm('ig', 'social'), utmMap), 'organico');
+});
+
+test('mapPagoOrganico — semântica 2026-07-24: ig/social/link_in_bio/frio = orgânico; FacebookADS/quente/video-ad = pago', () => {
+  // coluna explícita do fluxo velho segue vencendo tudo
+  assert.equal(mapPagoOrganico(utm('ig', 'social'), 'pago', utmMap), 'pago');
+  assert.equal(mapPagoOrganico(utm('FacebookADS', 'x'), 'organico', utmMap), 'organico');
+  // source = sinal mais forte: ig é Instagram ORGÂNICO, FacebookADS é pago
+  assert.equal(mapPagoOrganico(utm('ig', 'social'), '', utmMap), 'organico');
+  assert.equal(mapPagoOrganico(utm('FacebookADS', 'x'), '', utmMap), 'pago');
+  assert.equal(mapPagoOrganico(utm('BioOrganico', 'biografia-caio'), '', utmMap), 'organico');
+  // coluna com o utm_term cru (fluxo n8n novo): quente → pago, frio → orgânico
+  assert.equal(mapPagoOrganico(utm('', ''), 'quente', utmMap), 'pago');
+  assert.equal(mapPagoOrganico(utm('', ''), 'frio', utmMap), 'organico');
+  // …mas o source contraditório vence o term cru (FacebookADS com 'frio' segue pago)
+  assert.equal(mapPagoOrganico(utm('FacebookADS', 'x'), 'frio', utmMap), 'pago');
+  // sem source: term no próprio UTM decide (todo pago manda quente)
+  assert.equal(mapPagoOrganico(utm('', '', '', '', 'quente'), '', utmMap), 'pago');
+  assert.equal(mapPagoOrganico(utm('', '', '', '', 'frio'), '', utmMap), 'organico');
+  // content decide quando não há source/term: video-adX = criativo pago, link_in_bio = orgânico
+  assert.equal(mapPagoOrganico(utm('', '', '', 'video-ad02'), '', utmMap), 'pago');
+  assert.equal(mapPagoOrganico(utm('', '', '', 'link_in_bio'), '', utmMap), 'organico');
+  // medium com slug de público (ex. caiu-captura-…) é público do PAGO; 'social' é orgânico
+  assert.equal(mapPagoOrganico(utm('', 'caiu-captura-180d_vv-convite-50-30d'), '', utmMap), 'pago');
+  assert.equal(mapPagoOrganico(utm('', 'social'), '', utmMap), 'organico');
+  // valor desconhecido na coluna (ex.: 'comercial') → fallback pelas regras, não quebra
+  assert.equal(mapPagoOrganico(utm('Comercial', 'leo'), 'comercial', utmMap), 'organico');
 });
 
 test('enrichLeads — vendas casam por nome (aba VENDAS só tem nome) + não atribuído', () => {

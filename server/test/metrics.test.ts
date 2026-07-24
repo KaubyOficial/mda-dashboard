@@ -235,10 +235,152 @@ test('relatório por público — lead cujo utm_medium não existe na aba não �
   );
 });
 
-test('detalhe de leads — temperatura/origem/pago (§S4)', () => {
+test('KPI CPL — mini-métrica "só pago" usa só os leads pagos no denominador', () => {
+  const r = computeMetrics(fixture(), MARCO, META);
+  const cpl = kpi(r, 'cpl');
+  near(cpl.value, 80); // 400 ÷ 5 (todos)
+  assert.ok(cpl.sub, 'CPL deveria trazer a mini-métrica "só pago"');
+  assert.equal(cpl.sub!.label, 'só pago');
+  near(cpl.sub!.value, 100); // 400 ÷ 4 leads pagos (L3 orgânico sai do denominador)
+});
+
+test('KPI CPL "só pago" — sem lead pago no período vira null (não NaN/Infinity)', () => {
+  const f = fixture();
+  f.leads = f.leads.map((l) => ({ ...l, pagoOrganico: 'organico' as const }));
+  const r = computeMetrics(f, MARCO, META);
+  assert.equal(kpi(r, 'cpl').sub!.value, null);
+  assert.equal(kpi(r, 'cplMorno').sub!.value, null);
+  assert.equal(kpi(r, 'cplMql').sub!.value, null);
+});
+
+test('KPIs CPL morno/MQL — mini-métrica "só pago" desconta o orgânico do denominador', () => {
+  const f = fixture();
+  // vira o morno pago (L2) em orgânico: o CPL morno geral fica igual, mas o "só pago" some
+  f.leads = f.leads.map((l) => (l.id === 'L2' ? { ...l, pagoOrganico: 'organico' as const } : l));
+  const r = computeMetrics(f, MARCO, META);
+  near(kpi(r, 'cplMorno').value, 400); // 400 ÷ 1 morno (geral, não muda)
+  assert.equal(kpi(r, 'cplMorno').sub!.value, null); // 0 mornos pagos
+  near(kpi(r, 'cplMql').sub!.value as number, 200); // 400 ÷ 2 MQLs pagos (L1, L4)
+});
+
+test('funil pago × orgânico — mesmas etapas do comercial, atribuídas pelo lead casado', () => {
+  const r = computeMetrics(fixture(), MARCO, META);
+  const fp = r.funilPagoOrganico;
+  // pagos: L1, L2, L4, L5 · agend (A1,A2,A3 → leads pagos) · comparec: A1,A3 · vendas: V1,V2
+  const pago = Object.fromEntries(fp.pago.steps.map((s) => [s.key, s.value]));
+  assert.deepEqual(pago, { leads: 4, agendamentos: 3, comparecimentos: 2, vendas: 2 });
+  const rates = Object.fromEntries(fp.pago.steps.map((s) => [s.key, s.rateFromPrev]));
+  near(rates.agendamentos as number, 0.75); // 3/4
+  near(rates.comparecimentos as number, 2 / 3);
+  near(rates.vendas as number, 1);
+  near(fp.pago.conversaoTotal, 0.5); // 2/4
+  // orgânico: só L3, sem agendamento/venda
+  const org = Object.fromEntries(fp.organico.steps.map((s) => [s.key, s.value]));
+  assert.deepEqual(org, { leads: 1, agendamentos: 0, comparecimentos: 0, vendas: 0 });
+  near(fp.organico.conversaoTotal, 0); // 0/1
+  // tudo casou → nada no balde e nenhum warning de não-atribuído
+  assert.deepEqual(fp.naoAtribuido, { agendamentos: 0, comparecimentos: 0, vendas: 0 });
+  assert.ok(!r.meta.warnings.some((w) => /FUNIL PAGO × ORGÂNICO/.test(w)));
+});
+
+test('funil pago × orgânico — pago + orgânico + não atribuído = funil comercial, etapa a etapa', () => {
+  const f = fixture();
+  // venda órfã (sem lead) no período: precisa cair no "não atribuído", não sumir
+  f.vendas.push({ id: 'V9', date: '2026-03-08', emailKey: '', phoneKey: '', nameKey: 'ninguem', valorBRL: 999 });
+  const r = computeMetrics(f, MARCO, META);
+  const fp = r.funilPagoOrganico;
+  const na: Record<string, number> = { leads: 0, ...fp.naoAtribuido };
+  const soma = (key: string) =>
+    fp.pago.steps.find((s) => s.key === key)!.value +
+    fp.organico.steps.find((s) => s.key === key)!.value +
+    na[key]!;
+  for (const s of r.commercialFunnel.steps) assert.equal(soma(s.key), s.value, s.key);
+  assert.equal(fp.naoAtribuido.vendas, 1);
+  assert.ok(
+    r.meta.warnings.some((w) => /FUNIL PAGO × ORGÂNICO/.test(w) && /não atribuído/.test(w)),
+    'deveria declarar o evento sem lead casado',
+  );
+});
+
+test('funil pago × orgânico — venda de lead ANTIGO conta no período da venda (igual ao KPI)', () => {
+  const f = fixture();
+  // lead pago de FEVEREIRO que comprou em MARÇO: a venda tem que aparecer no recorte de março
+  f.leads.push({
+    ...f.leads[0]!,
+    id: 'L0',
+    date: '2026-02-10',
+    emailKey: 'z@x.test',
+    phoneKey: '11999990009',
+    nameKey: 'zeca prado',
+  });
+  f.vendas.push({ id: 'V3', date: '2026-03-10', emailKey: '', phoneKey: '', nameKey: 'zeca prado', valorBRL: 1000 });
+  const r = computeMetrics(f, MARCO, META);
+  const pago = Object.fromEntries(r.funilPagoOrganico.pago.steps.map((s) => [s.key, s.value]));
+  assert.equal(pago.leads, 4); // L0 é de fevereiro — não entra nos leads de março
+  assert.equal(pago.vendas, 3); // mas a venda dele é de março e entra (V1, V2, V3)
+  // e bate com o KPI de vendas do período
+  assert.equal(r.kpis.find((k) => k.key === 'vendas')!.value, 3);
+});
+
+test('origens do orgânico — canal canônico: variações de link-da-bio viram UMA linha', () => {
+  const f = fixture();
+  // 3 grafias reais do MESMO canal (Kauê 2026-07-24): ig·social·link_in_bio,
+  // BioOrganico·biografia-caio·organico e social·link_in_bio → todas origem 'bio'
+  const clone = (id: string, email: string, utm: Partial<(typeof f.leads)[number]['utm']>) => ({
+    ...f.leads[2]!,
+    id,
+    emailKey: email,
+    phoneKey: '',
+    nameKey: id,
+    utm: { source: '', medium: '', campaign: '', content: '', term: '', ...utm },
+  });
+  f.leads.push(clone('L7', 'g@x.test', { source: 'BioOrganico', medium: 'biografia-caio', content: 'organico' }));
+  f.leads.push(clone('L8', 'h@x.test', { medium: 'social', content: 'link_in_bio' }));
+  const r = computeMetrics(f, MARCO, META);
+  const bio = r.origensOrganico.find((o) => o.origem === 'Link da bio');
+  assert.ok(bio, 'as variações de link-da-bio deveriam colapsar em "Link da bio"');
+  assert.equal(bio!.leads, 3); // L3 + L7 + L8 numa linha só
+  assert.equal(r.origensOrganico.length, 1);
+  near(bio!.conversaoTotal, 0);
+});
+
+test('origens do orgânico — sem UTM vira "(sem UTM)", canal desconhecido mantém rótulo cru, pago fica fora', () => {
+  const f = fixture();
+  const base = f.leads[2]!;
+  f.leads.push({
+    ...base,
+    id: 'L6',
+    emailKey: 'f@x.test',
+    phoneKey: '11999990006',
+    nameKey: 'fabi luz',
+    qualificacao: 'MQL',
+    origem: 'organico', // sem UTM nenhuma → não cai em regra de origem
+    utm: { source: '', medium: '', campaign: '', content: '', term: '' },
+  });
+  f.leads.push({
+    ...base,
+    id: 'L9',
+    emailKey: 'i@x.test',
+    phoneKey: '11999990009',
+    nameKey: 'igor sá',
+    origem: 'organico', // canal novo que nenhuma regra conhece → rótulo cru denuncia
+    utm: { source: 'youtube', medium: 'video', campaign: '', content: '', term: '' },
+  });
+  const r = computeMetrics(f, MARCO, META);
+  const semUtm = r.origensOrganico.find((o) => o.origem === '(sem UTM)');
+  assert.ok(semUtm, 'lead orgânico sem UTM deveria aparecer como "(sem UTM)"');
+  assert.equal(semUtm!.mqls, 1);
+  assert.ok(r.origensOrganico.some((o) => o.origem === 'youtube · video'));
+  // nenhum lead pago vaza pro quadro de orgânico
+  const totalOrganico = r.origensOrganico.reduce((s, o) => s + o.leads, 0);
+  assert.equal(totalOrganico, 3); // L3 + L6 + L9
+});
+
+test('detalhe de leads — temperatura/origem/pago (§S4; temperatura segue pago/orgânico)', () => {
   const d = computeMetrics(fixture(), MARCO, META).leadsDetail;
   assert.equal(d.total, 5);
-  assert.deepEqual(d.porTemperatura, { quente: 2, morno: 1, frio: 2 });
+  // 2026-07-24: pago=quente (4), orgânico=morno (1); 'frio' não existe mais → nem aparece
+  assert.deepEqual(d.porTemperatura, { quente: 4, morno: 1 });
   assert.equal(d.porOrigem.anuncio, 4);
   assert.equal(d.porOrigem.bio, 1);
   assert.deepEqual(d.pagoVsOrganico, { pago: 4, organico: 1 });

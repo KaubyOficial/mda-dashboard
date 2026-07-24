@@ -1,15 +1,18 @@
-import type { DataSnapshot } from '../domain/entities.js';
+import type { Agendamento, DataSnapshot, Lead, Venda } from '../domain/entities.js';
 import type {
   AnuncioRow,
   CommercialFunnel,
   DailyPoint,
+  FunilPagoOrganico,
   Kpi,
   LeadsDetail,
   MarketingFunnel,
   MetricsResponse,
+  OrigemOrganicaRow,
   PublicoRow,
   Range,
   SegmentRow,
+  SplitFunnel,
 } from '../domain/metrics.js';
 import type { EnrichedLead } from '../crossjoin/match.js';
 import { enrichLeads } from '../crossjoin/match.js';
@@ -22,8 +25,11 @@ interface BaseAgg {
   investimento: number;
   lucro: number;
   leadsTotal: number;
+  leadsPago: number;
   leadsMorno: number;
   leadsMql: number;
+  leadsMornoPago: number;
+  leadsMqlPago: number;
   nVendas: number;
   nAgend: number;
   nComp: number;
@@ -43,8 +49,11 @@ function baseAgg(enriched: EnrichedLead[], snap: DataSnapshot, range: Range): Ba
     investimento,
     lucro: faturamento - investimento,
     leadsTotal: leads.length,
+    leadsPago: leads.filter((l) => l.pagoOrganico === 'pago').length,
     leadsMorno: leads.filter((l) => l.qualificacao === 'Morno').length,
     leadsMql: leads.filter((l) => l.qualificacao === 'MQL').length,
+    leadsMornoPago: leads.filter((l) => l.qualificacao === 'Morno' && l.pagoOrganico === 'pago').length,
+    leadsMqlPago: leads.filter((l) => l.qualificacao === 'MQL' && l.pagoOrganico === 'pago').length,
     nVendas: vendasRange.length,
     nAgend: agendRange.length,
     nComp: agendRange.filter((a) => a.compareceu).length,
@@ -56,6 +65,11 @@ function baseAgg(enriched: EnrichedLead[], snap: DataSnapshot, range: Range): Ba
 function computeKpis(cur: BaseAgg, prev: BaseAgg): Kpi[] {
   const cplTodos = safeDiv(cur.investimento, cur.leadsTotal);
   const cplTodosPrev = safeDiv(prev.investimento, prev.leadsTotal);
+  // Todo o investimento é tráfego pago, mas os denominadores misturam orgânico — a versão
+  // "só pago" de cada CPL é o custo real do lead comprado (denominador = só leads pagos).
+  const cplPago = safeDiv(cur.investimento, cur.leadsPago);
+  const cplMornoPago = safeDiv(cur.investimento, cur.leadsMornoPago);
+  const cplMqlPago = safeDiv(cur.investimento, cur.leadsMqlPago);
   const cplMorno = safeDiv(cur.investimento, cur.leadsMorno);
   const cplMornoPrev = safeDiv(prev.investimento, prev.leadsMorno);
   const cplMql = safeDiv(cur.investimento, cur.leadsMql);
@@ -74,9 +88,33 @@ function computeKpis(cur: BaseAgg, prev: BaseAgg): Kpi[] {
     kpi('vendas', 'Vendas', cur.nVendas, prev.nVendas, 'number', 'up', 'nº de vendas no período'),
     kpi('leads', 'Leads', cur.leadsTotal, prev.leadsTotal, 'number', 'up', 'nº de leads no período'),
     kpi('cpm', 'CPM', cpm ?? 0, cpmPrev ?? 0, 'currency', 'down', 'Investimento ÷ Impressões × 1.000'),
-    kpi('cpl', 'CPL (todos)', cplTodos ?? 0, cplTodosPrev ?? 0, 'currency', 'down', 'Investimento ÷ Leads totais'),
-    kpi('cplMorno', 'CPL morno', cplMorno ?? 0, cplMornoPrev ?? 0, 'currency', 'down', 'Investimento ÷ Leads mornos'),
-    kpi('cplMql', 'CPL MQL', cplMql ?? 0, cplMqlPrev ?? 0, 'currency', 'down', 'Investimento ÷ MQLs'),
+    {
+      ...kpi('cpl', 'CPL (todos)', cplTodos ?? 0, cplTodosPrev ?? 0, 'currency', 'down', 'Investimento ÷ Leads totais (pagos + orgânicos)'),
+      sub: {
+        label: 'só pago',
+        value: cplPago,
+        format: 'currency',
+        formula: 'Investimento ÷ Leads pagos — custo real do lead comprado (o orgânico sai do denominador)',
+      },
+    },
+    {
+      ...kpi('cplMorno', 'CPL morno', cplMorno ?? 0, cplMornoPrev ?? 0, 'currency', 'down', 'Investimento ÷ Leads mornos (pagos + orgânicos)'),
+      sub: {
+        label: 'só pago',
+        value: cplMornoPago,
+        format: 'currency',
+        formula: 'Investimento ÷ Leads mornos vindos do tráfego pago',
+      },
+    },
+    {
+      ...kpi('cplMql', 'CPL MQL', cplMql ?? 0, cplMqlPrev ?? 0, 'currency', 'down', 'Investimento ÷ MQLs (pagos + orgânicos)'),
+      sub: {
+        label: 'só pago',
+        value: cplMqlPago,
+        format: 'currency',
+        formula: 'Investimento ÷ MQLs vindos do tráfego pago',
+      },
+    },
     kpi('cac', 'CAC', cac ?? 0, cacPrev ?? 0, 'currency', 'down', 'Investimento ÷ nº de vendas'),
     kpi('conversao', 'Conversão lead→venda', (conv ?? 0) * 100, (convPrev ?? 0) * 100, 'percent', 'up', 'Vendas ÷ Leads totais'),
     kpi('roas', 'ROAS', cur.roas ?? 0, prev.roas ?? 0, 'ratio', 'up', 'Faturamento ÷ Investimento'),
@@ -124,11 +162,13 @@ function computeDaily(enriched: EnrichedLead[], snap: DataSnapshot, range: Range
 
 function computeLeadsDetail(enriched: EnrichedLead[], range: Range): LeadsDetail {
   const leads = enriched.filter((l) => isInRange(l.date, range));
-  const porTemperatura: Record<string, number> = { quente: 0, morno: 0, frio: 0 };
+  const porTemperatura: Record<string, number> = {};
   const porOrigem: Record<string, number> = {};
   let pago = 0;
   let organico = 0;
   for (const l of leads) {
+    // só temperaturas que existem no período — desde 2026-07-24 'frio' não é mais atribuída
+    // (pago=quente, orgânico=morno) e um "Frio 0" perene na legenda seria ruído.
     porTemperatura[l.temperatura] = (porTemperatura[l.temperatura] ?? 0) + 1;
     porOrigem[l.origem] = (porOrigem[l.origem] ?? 0) + 1;
     if (l.pagoOrganico === 'pago') pago++;
@@ -262,6 +302,112 @@ function computeCommercialFunnel(
     custoPorAgendamento: safeDiv(invest, nAgend),
     custoPorVenda: safeDiv(invest, nVendas),
   };
+}
+
+/**
+ * Funil comercial recortado por origem do lead (pago × orgânico).
+ *
+ * As etapas contam pela DATA DO EVENTO, exatamente como o funil comercial geral — agendamento
+ * pela data da call, venda pela data da venda — para que os recortes SOMEM com o funil geral
+ * (venda de julho de um lead de junho conta em julho, igual ao KPI de vendas). A origem
+ * (pago/orgânico) só existe no LEAD, então cada evento é atribuído pelo lead casado
+ * (e-mail→telefone→nome); evento sem lead casado vai pro balde `naoAtribuido`, contado e
+ * exibido em vez de sumir — pago + orgânico + não atribuído = funil comercial geral.
+ */
+function splitFunnel(nLeads: number, agend: Agendamento[], vendas: Venda[]): SplitFunnel {
+  const nAgend = agend.length;
+  const nComp = agend.filter((a) => a.compareceu).length;
+  const nVendas = vendas.length;
+  const steps = [
+    { key: 'leads', label: 'Leads', value: nLeads },
+    { key: 'agendamentos', label: 'Agendamentos', value: nAgend },
+    { key: 'comparecimentos', label: 'Comparecimentos', value: nComp },
+    { key: 'vendas', label: 'Vendas', value: nVendas },
+  ].map((st, i, arr) => ({
+    ...st,
+    rateFromPrev: i === 0 ? null : safeDiv(st.value, arr[i - 1]!.value),
+  }));
+  return { steps, conversaoTotal: safeDiv(nVendas, nLeads) };
+}
+
+function computeFunilPagoOrganico(
+  enriched: EnrichedLead[],
+  agendamentosComLead: { ag: Agendamento; lead: Lead | null }[],
+  vendasComLead: { venda: Venda; lead: Lead | null }[],
+  range: Range,
+  warnings: string[],
+): FunilPagoOrganico {
+  const leads = enriched.filter((l) => isInRange(l.date, range));
+  const agRange = agendamentosComLead.filter((x) => isInRange(x.ag.date, range));
+  const vRange = vendasComLead.filter((x) => isInRange(x.venda.date, range));
+
+  const porSplit = (split: 'pago' | 'organico'): SplitFunnel =>
+    splitFunnel(
+      leads.filter((l) => l.pagoOrganico === split).length,
+      agRange.filter((x) => x.lead?.pagoOrganico === split).map((x) => x.ag),
+      vRange.filter((x) => x.lead?.pagoOrganico === split).map((x) => x.venda),
+    );
+
+  const agSem = agRange.filter((x) => x.lead === null);
+  const vSem = vRange.filter((x) => x.lead === null);
+  if (agSem.length > 0 || vSem.length > 0) {
+    warnings.push(
+      `FUNIL PAGO × ORGÂNICO: ${agSem.length} agendamento(s) e ${vSem.length} venda(s) do período não casaram com nenhum lead (sem e-mail/telefone/nome correspondente na LEADS) — sem lead não dá pra saber a origem, então ficam no "não atribuído" (continuam contados no funil comercial geral).`,
+    );
+  }
+  return {
+    pago: porSplit('pago'),
+    organico: porSplit('organico'),
+    naoAtribuido: {
+      agendamentos: agSem.length,
+      comparecimentos: agSem.filter((x) => x.ag.compareceu).length,
+      vendas: vSem.length,
+    },
+  };
+}
+
+/**
+ * De onde vêm os leads ORGÂNICOS (§ pedido 2026-07-24): o pago tem relatório por anúncio/público,
+ * o orgânico não tinha nada. O rótulo é CANÔNICO, não a UTM crua: `ig·social·link_in_bio`,
+ * `BioOrganico·biografia-caio·organico` e `social·link_in_bio` são todos o MESMO canal (link da
+ * bio, Kauê 2026-07-24) e viravam 3 linhas. A canonização reusa a `origem` do lead (já mapeada
+ * pelas origin_rules do utm-map); UTM que não cai em nenhum canal conhecido fica com o rótulo
+ * cru (source · medium · content) pra não esconder canal novo.
+ */
+function origemOrganicaLabel(l: EnrichedLead): string {
+  if (l.origem === 'bio') return 'Link da bio';
+  if (l.origem === 'comercial') return 'Comercial';
+  const parts = [l.utm.source, l.utm.medium, l.utm.content].map((s) => s.trim()).filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : '(sem UTM)';
+}
+
+function computeOrigensOrganico(enriched: EnrichedLead[], range: Range): OrigemOrganicaRow[] {
+  const organicos = enriched.filter(
+    (l) => isInRange(l.date, range) && l.pagoOrganico === 'organico',
+  );
+  const acc = new Map<
+    string,
+    { leads: number; mornos: number; mqls: number; agendamentos: number; vendas: number }
+  >();
+  for (const l of organicos) {
+    const key = origemOrganicaLabel(l);
+    const cur = acc.get(key) ?? { leads: 0, mornos: 0, mqls: 0, agendamentos: 0, vendas: 0 };
+    cur.leads++;
+    if (l.qualificacao === 'MQL') cur.mqls++;
+    else if (l.qualificacao === 'Morno') cur.mornos++;
+    if (l.temAgendamento) cur.agendamentos++;
+    if (l.temVenda) cur.vendas++;
+    acc.set(key, cur);
+  }
+  return [...acc.entries()]
+    .map(
+      ([origem, v]): OrigemOrganicaRow => ({
+        origem,
+        ...v,
+        conversaoTotal: safeDiv(v.vendas, v.leads),
+      }),
+    )
+    .sort((a, b) => b.leads - a.leads);
 }
 
 function computeSegments(
@@ -406,7 +552,7 @@ export function computeMetrics(
   meta: ComputeMeta,
   preset?: string,
 ): MetricsResponse {
-  const { enriched } = enrichLeads(snap);
+  const { enriched, agendamentosComLead, vendasComLead } = enrichLeads(snap);
   const prevRange = previousRange(range, preset);
   const cur = baseAgg(enriched, snap, range);
   const prev = baseAgg(enriched, snap, prevRange);
@@ -422,9 +568,11 @@ export function computeMetrics(
     leadsDetail: computeLeadsDetail(enriched, range),
     marketingFunnel: computeMarketingFunnel(snap, enriched, range, warnings),
     commercialFunnel: computeCommercialFunnel(enriched, snap, range, warnings),
+    funilPagoOrganico: computeFunilPagoOrganico(enriched, agendamentosComLead, vendasComLead, range, warnings),
     segments: computeSegments(enriched, cur.investimento, range, warnings),
     porPublico: computePorPublico(snap, enriched, range, warnings),
     porAnuncio: computePorAnuncio(snap, enriched, range, warnings),
+    origensOrganico: computeOrigensOrganico(enriched, range),
     meta: {
       lastSync: meta.lastSync,
       stale: meta.stale,

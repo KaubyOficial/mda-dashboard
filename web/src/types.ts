@@ -18,6 +18,13 @@ export interface Kpi {
   format: 'currency' | 'number' | 'percent' | 'ratio';
   formula: string;
   delta: Delta;
+  /** mini-métrica exibida embaixo do valor principal (ex.: CPL só do tráfego pago). */
+  sub?: {
+    label: string;
+    value: number | null;
+    format: 'currency' | 'number' | 'percent' | 'ratio';
+    formula: string;
+  };
 }
 export interface DailyPoint {
   date: string;
@@ -52,6 +59,27 @@ export interface CommercialFunnel {
   ticketMedio: number | null;
   custoPorAgendamento: number | null;
   custoPorVenda: number | null;
+}
+/** Funil comercial recortado por origem do lead (pago × orgânico); etapas por data do evento. */
+export interface SplitFunnel {
+  steps: FunnelStep[];
+  conversaoTotal: number | null;
+}
+export interface FunilPagoOrganico {
+  pago: SplitFunnel;
+  organico: SplitFunnel;
+  /** eventos do período sem lead casado (origem indecidível). */
+  naoAtribuido: { agendamentos: number; comparecimentos: number; vendas: number };
+}
+/** De onde vêm os leads ORGÂNICOS — agrupado pela UTM (source · medium · content). */
+export interface OrigemOrganicaRow {
+  origem: string;
+  leads: number;
+  mornos: number;
+  mqls: number;
+  agendamentos: number;
+  vendas: number;
+  conversaoTotal: number | null;
 }
 export interface SegmentRow {
   segmento: string;
@@ -99,9 +127,11 @@ export interface MetricsResponse {
   leadsDetail: LeadsDetail;
   marketingFunnel: MarketingFunnel;
   commercialFunnel: CommercialFunnel;
+  funilPagoOrganico: FunilPagoOrganico;
   segments: SegmentRow[];
   porPublico: PublicoRow[];
   porAnuncio: AnuncioRow[];
+  origensOrganico: OrigemOrganicaRow[];
   meta: {
     lastSync: string | null;
     stale: boolean;

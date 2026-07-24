@@ -139,9 +139,9 @@ export class MockSource implements DataSource {
         const q = this.rnd();
         const qualificacao: Qualificacao =
           q < 0.08 ? 'MQL' : q < 0.3 ? 'Morno' : 'Fora do perfil';
-        const t = this.rnd();
-        const temperatura: Temperatura = t < 0.3 ? 'quente' : t < 0.6 ? 'morno' : 'frio';
         const paid: PagoOrganico = this.rnd() < 0.8 ? 'pago' : 'organico';
+        // regra 2026-07-24: pago = quente, orgânico = morno (mesma derivação do parser real)
+        const temperatura: Temperatura = paid === 'pago' ? 'quente' : 'morno';
         const origem: Origem = paid === 'pago' ? 'anuncio' : this.rnd() < 0.5 ? 'bio' : 'organico';
         const lead: Lead = {
           id: `${emailKey}|${date}`,

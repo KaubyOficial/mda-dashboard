@@ -7,9 +7,9 @@ import { Shell, Warnings } from './components/Shell';
 import { KpiHero } from './components/KpiHero';
 import { DailyCharts } from './components/DailyCharts';
 import { LeadsDetail } from './components/LeadsDetail';
-import { CommercialFunnelView, MarketingFunnelView } from './components/Funnels';
+import { CommercialFunnelView, MarketingFunnelView, PagoOrganicoFunnelView } from './components/Funnels';
 import { Segments } from './components/Segments';
-import { ReportAnuncio, ReportPublico } from './components/Reports';
+import { ReportAnuncio, ReportOrganico, ReportPublico } from './components/Reports';
 import { ErrorState, Loading } from './components/states';
 
 interface UrlState {
@@ -121,9 +121,11 @@ export function App() {
               <MarketingFunnelView funnel={data.marketingFunnel} />
               <CommercialFunnelView funnel={data.commercialFunnel} />
             </div>
+            <PagoOrganicoFunnelView data={data.funilPagoOrganico} />
             <Segments segments={data.segments} />
             <ReportPublico rows={data.porPublico} />
             <ReportAnuncio rows={data.porAnuncio} />
+            <ReportOrganico rows={data.origensOrganico} />
             {loading && <div className="text-center text-xs text-muted">atualizando…</div>}
           </>
         )}

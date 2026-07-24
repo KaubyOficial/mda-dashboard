@@ -33,9 +33,12 @@ const GAP = 4;
 export function FunnelShape({
   steps,
   aside,
+  color,
 }: {
   steps: FunnelStep[];
   aside?: (step: FunnelStep, i: number) => string | null;
+  /** cor base das faixas (hex); default = dourado do tema. Usada p/ distinguir funis lado a lado. */
+  color?: string;
 }) {
   const w = widths(steps);
 
@@ -64,9 +67,20 @@ export function FunnelShape({
             {/* trapézio — etapa parcial fica hachurada pra não passar por número fechado */}
             <div
               className={`relative flex flex-1 items-center justify-center ${
-                s.partial ? 'bg-gold/50' : 'bg-gradient-to-b from-gold to-gold/80'
+                color ? '' : s.partial ? 'bg-gold/50' : 'bg-gradient-to-b from-gold to-gold/80'
               }`}
-              style={{ height: BAND_H, clipPath: poly }}
+              style={{
+                height: BAND_H,
+                clipPath: poly,
+                // cor custom via style (classe Tailwind dinâmica não compila)
+                ...(color
+                  ? {
+                      background: s.partial
+                        ? `${color}80`
+                        : `linear-gradient(to bottom, ${color}, ${color}CC)`,
+                    }
+                  : {}),
+              }}
               title={s.partial ? 'Etapa subcontada: o campo não foi rastreado em parte do período (ver avisos)' : undefined}
             >
               <span className="font-display text-sm font-bold tabular-nums text-ink">

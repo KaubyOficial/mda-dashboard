@@ -27,6 +27,14 @@ export function KpiHero({ kpis }: { kpis: Kpi[] }) {
           <div className="mt-1 font-display text-2xl font-bold text-text">
             {fmtValue(k.value, k.format)}
           </div>
+          {k.sub && (
+            <div className="mt-0.5 text-[11px] text-muted" title={k.sub.formula}>
+              {k.sub.label}:{' '}
+              <span className="font-semibold tabular-nums text-text/90">
+                {k.sub.value === null ? '—' : fmtValue(k.sub.value, k.sub.format)}
+              </span>
+            </div>
+          )}
           <div className="mt-2">
             <DeltaBadge kpi={k} />
           </div>

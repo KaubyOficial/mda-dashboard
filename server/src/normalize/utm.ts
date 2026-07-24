@@ -3,17 +3,18 @@ import { unescapeCell } from '../util/parse.js';
 
 interface UtmRule {
   when: { field: keyof UtmSet; contains: string };
-  temperature?: Temperatura;
   origin?: Origem;
 }
+interface PagoOrganicoRule {
+  when: { field: keyof UtmSet; contains: string };
+  value: PagoOrganico;
+}
 export interface UtmMap {
-  temperature_rules: UtmRule[];
-  default_temperature: Temperatura;
   origin_rules: UtmRule[];
   default_origin: Origem;
-  paid_rules: {
-    paid_sources_contains: string[];
-    organic_sources_contains: string[];
+  pago_organico_rules: {
+    rules: PagoOrganicoRule[];
+    default: PagoOrganico;
   };
 }
 
@@ -21,13 +22,14 @@ function fieldVal(utm: UtmSet, field: keyof UtmSet): string {
   return unescapeCell(utm[field] ?? '').toLowerCase();
 }
 
-export function mapTemperatura(utm: UtmSet, map: UtmMap): Temperatura {
-  for (const r of map.temperature_rules) {
-    if (r.temperature && fieldVal(utm, r.when.field).includes(r.when.contains.toLowerCase())) {
-      return r.temperature;
-    }
-  }
-  return map.default_temperature;
+/**
+ * Temperatura NÃO vem mais de regras de UTM (Kauê 2026-07-24): todo tráfego pago manda
+ * term=quente (100% quente hoje) e orgânico que virou lead é NO MÍNIMO morno. Não existe
+ * sinal na UTM que meça "frio" de verdade — as regras antigas por medium marcavam a maioria
+ * do orgânico como frio no chute.
+ */
+export function mapTemperatura(pagoOrganico: PagoOrganico): Temperatura {
+  return pagoOrganico === 'pago' ? 'quente' : 'morno';
 }
 
 export function mapOrigem(utm: UtmSet, map: UtmMap): Origem {
@@ -39,7 +41,15 @@ export function mapOrigem(utm: UtmSet, map: UtmMap): Origem {
   return map.default_origin;
 }
 
-/** Coluna 'ORGANICO OU PAGO?' vence quando presente; senão, fallback pelas regras de source. */
+/**
+ * Pago × orgânico. Precedência:
+ * 1. Coluna 'ORGANICO OU PAGO?' com 'pago'/'organico' explícito (fluxo n8n velho) — vence sempre.
+ * 2. Regras da UTM em ordem (source primeiro: é o sinal mais forte — FacebookADS=pago, ig=orgânico;
+ *    um source pago com term contraditório continua pago).
+ * 3. Coluna com o utm_term CRU (fluxo n8n novo, 2026-07-22+): a semântica do funil (Kauê
+ *    2026-07-24) é term 'quente' = tráfego pago e 'frio' = orgânico — o term NÃO mede temperatura
+ *    (todo pago viria 'quente'; a temperatura do orgânico fica indefinida).
+ */
 export function mapPagoOrganico(
   utm: UtmSet,
   rawColumn: string | null | undefined,
@@ -48,9 +58,10 @@ export function mapPagoOrganico(
   const col = unescapeCell(rawColumn ?? '').toLowerCase();
   if (col.includes('pago')) return 'pago';
   if (col.includes('org')) return 'organico'; // orgânico / organico
-  const src = fieldVal(utm, 'source');
-  if (map.paid_rules.paid_sources_contains.some((s) => src.includes(s.toLowerCase()))) return 'pago';
-  if (map.paid_rules.organic_sources_contains.some((s) => src.includes(s.toLowerCase())))
-    return 'organico';
-  return 'organico';
+  for (const r of map.pago_organico_rules.rules) {
+    if (fieldVal(utm, r.when.field).includes(r.when.contains.toLowerCase())) return r.value;
+  }
+  if (col === 'quente') return 'pago';
+  if (col === 'frio') return 'organico';
+  return map.pago_organico_rules.default;
 }

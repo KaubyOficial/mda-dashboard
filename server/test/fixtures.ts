@@ -11,11 +11,12 @@ export function fixture(): DataSnapshot {
     // público pelo slug ('ig-visitou-7d' ↔ '00 - IG Visitou 7D') — igual ao dado real.
     leads: [
       lead('L1', '2026-03-01', 'MQL', 'quente', 'pago', 'anuncio', 'video-ad1', 'ig-visitou-7d', 'a@x.test', '11999990001', 'ana souza'),
-      lead('L2', '2026-03-01', 'Morno', 'morno', 'pago', 'anuncio', 'video-ad1', 'ig-visitou-7d', 'b@x.test', '11999990002', 'bruno lima'),
+      lead('L2', '2026-03-01', 'Morno', 'quente', 'pago', 'anuncio', 'video-ad1', 'ig-visitou-7d', 'b@x.test', '11999990002', 'bruno lima'),
       // orgânico: sem anúncio e com público que não existe na aba → entra no unmatched das duas atribuições
-      lead('L3', '2026-03-02', 'Fora do perfil', 'frio', 'organico', 'bio', 'link_in_bio', 'social', 'c@x.test', '11999990003', 'caio dias'),
+      // (source ig = Instagram orgânico; UTM real do link da bio)
+      lead('L3', '2026-03-02', 'Fora do perfil', 'morno', 'organico', 'bio', 'link_in_bio', 'social', 'c@x.test', '11999990003', 'caio dias', 'ig'),
       lead('L4', '2026-03-02', 'MQL', 'quente', 'pago', 'anuncio', 'video-ad2', 'aberto-h-22-44', 'd@x.test', '11999990004', 'duda reis'),
-      lead('L5', '2026-03-02', 'Fora do perfil', 'frio', 'pago', 'anuncio', 'video-ad1', 'ig-visitou-7d', 'e@x.test', '11999990005', 'edu melo'),
+      lead('L5', '2026-03-02', 'Fora do perfil', 'quente', 'pago', 'anuncio', 'video-ad1', 'ig-visitou-7d', 'e@x.test', '11999990005', 'edu melo'),
     ],
     agendamentos: [
       ag('A1', '2026-03-03', 'CALL REALIZADA', 'a@x.test', '11999990001', 'ana souza'),
@@ -55,6 +56,7 @@ function lead(
   emailKey: string,
   phoneKey: string,
   nameKey: string,
+  source = 'FacebookADS',
 ): DataSnapshot['leads'][number] {
   return {
     id,
@@ -66,7 +68,7 @@ function lead(
     temperatura,
     origem,
     pagoOrganico,
-    utm: { source: 'FacebookADS', medium, campaign: 'OCDM', content, term: '' },
+    utm: { source, medium, campaign: 'OCDM', content, term: '' },
     rendaBRL: qualificacao === 'Fora do perfil' ? 1000 : 5000,
     conhecePlusSemana: qualificacao === 'MQL',
   };

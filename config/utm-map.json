@@ -1,53 +1,40 @@
 {
-  "_doc": "Story 0.2 — mapeamento UTM → temperatura/origem/pago-orgânico. Editável sem deploy. Regras avaliadas em ordem: a primeira que casar vence. 'match' casa por substring case-insensitive no campo indicado. Fallback = default_* no fim. Valores ancorados nas UTMs REAIS da aba LEADS (export 2026-06-11).",
-  "version": "2026-07-07",
-  "temperature_rules": [
-    {
-      "when": { "field": "medium", "contains": "lookalike-1-lista-de-compradores" },
-      "temperature": "quente",
-      "note": "lookalike de compradores = público mais quente"
-    },
-    {
-      "when": { "field": "campaign", "contains": "REMARKETING" },
-      "temperature": "quente"
-    },
-    {
-      "when": { "field": "medium", "contains": "caiu-captura" },
-      "temperature": "quente",
-      "note": "já passou pela captura — remarketing de convite"
-    },
-    {
-      "when": { "field": "medium", "contains": "ig-visitou-7d" },
-      "temperature": "quente"
-    },
-    {
-      "when": { "field": "medium", "contains": "envolvimento" },
-      "temperature": "morno",
-      "note": "públicos de envolvimento (7d/30d/180d)"
-    },
-    {
-      "when": { "field": "source", "contains": "BioOrganico" },
-      "temperature": "frio",
-      "note": "orgânico topo de funil"
-    },
-    {
-      "when": { "field": "medium", "contains": "social" },
-      "temperature": "frio"
-    }
-  ],
-  "default_temperature": "frio",
+  "_doc": "Story 0.2 — mapeamento UTM → origem/pago-orgânico. Editável sem deploy. Regras avaliadas em ordem: a primeira que casar vence. 'contains' casa por substring case-insensitive no campo indicado. Fallback = default_* no fim. Semântica confirmada pelo Kauê 2026-07-24: source ig = Instagram ORGÂNICO (pago é FacebookADS) · medium social = orgânico (medium com slug de público, ex. caiu-captura-…, é público do PAGO) · term quente = pago e o outro term (frio) = orgânico (term NÃO mede temperatura) · content link_in_bio = orgânico e diz de onde veio; video-adX = criativo do pago. TEMPERATURA não é mais configurável: pago = quente (todo pago manda term quente), orgânico = morno no mínimo (regra fixa em normalize/utm.ts).",
+  "version": "2026-07-24b",
   "origin_rules": [
     { "when": { "field": "source", "contains": "BioOrganico" }, "origin": "bio" },
     { "when": { "field": "medium", "contains": "biografia" }, "origin": "bio" },
+    {
+      "when": { "field": "content", "contains": "link_in_bio" },
+      "origin": "bio",
+      "note": "content link_in_bio = orgânico vindo do link da bio"
+    },
     { "when": { "field": "source", "contains": "FacebookADS" }, "origin": "anuncio" },
-    { "when": { "field": "source", "contains": "fb" }, "origin": "anuncio" },
-    { "when": { "field": "source", "contains": "ig" }, "origin": "anuncio" },
+    {
+      "when": { "field": "content", "contains": "video-ad" },
+      "origin": "anuncio",
+      "note": "content video-adX = criativo do tráfego pago"
+    },
+    { "when": { "field": "term", "contains": "quente" }, "origin": "anuncio", "note": "term quente só existe no pago" },
     { "when": { "field": "source", "contains": "Comercial" }, "origin": "comercial" }
   ],
   "default_origin": "organico",
-  "paid_rules": {
-    "_doc": "Se a aba LEADS já traz coluna 'ORGANICO OU PAGO?', ela vence (normalizada). Estas regras são o fallback quando a coluna vem vazia.",
-    "paid_sources_contains": ["FacebookADS", "fb", "ig"],
-    "organic_sources_contains": ["BioOrganico", "Organico", "organico"]
+  "pago_organico_rules": {
+    "_doc": "Se a aba LEADS já traz coluna 'ORGANICO OU PAGO?' com pago/organico, ela vence; se ela vem com o utm_term cru (fluxo n8n novo), quente→pago e frio→orgânico. Estas regras decidem pelo resto da UTM — source é o sinal mais forte, por isso vem primeiro.",
+    "rules": [
+      { "when": { "field": "source", "contains": "FacebookADS" }, "value": "pago" },
+      { "when": { "field": "source", "contains": "BioOrganico" }, "value": "organico" },
+      { "when": { "field": "source", "contains": "ig" }, "value": "organico", "note": "source ig = Instagram orgânico (Kauê 2026-07-24)" },
+      { "when": { "field": "term", "contains": "quente" }, "value": "pago" },
+      { "when": { "field": "term", "contains": "frio" }, "value": "organico" },
+      { "when": { "field": "content", "contains": "video-ad" }, "value": "pago" },
+      { "when": { "field": "content", "contains": "link_in_bio" }, "value": "organico" },
+      { "when": { "field": "medium", "contains": "caiu-captura" }, "value": "pago" },
+      { "when": { "field": "medium", "contains": "lookalike" }, "value": "pago" },
+      { "when": { "field": "medium", "contains": "envolvimento" }, "value": "pago" },
+      { "when": { "field": "medium", "contains": "visitou" }, "value": "pago" },
+      { "when": { "field": "medium", "contains": "social" }, "value": "organico" }
+    ],
+    "default": "organico"
   }
 }
