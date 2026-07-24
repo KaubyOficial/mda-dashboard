@@ -1,0 +1,274 @@
+{
+  "name": "[FLUXO DE CAPTAÇÃO] [LEADS] [MDA] [OCDM] NOVO ATIVO (CORRIGIDO 2026-07-23)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mentoria-cadastro",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [256, -272],
+      "id": "8b204bfb-e932-4324-b74d-3bc0cd6452c4",
+      "name": "Webhook",
+      "webhookId": "89492469-d2e4-4a71-8c94-1f28d196b487"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.item.json;\n// Robusto aos dois formatos: form mandando JSON string (body chega string)\n// ou application/json (body já chega objeto). Antes: JSON.parse em objeto quebrava.\nconst body = typeof item.body === 'string' ? JSON.parse(item.body) : item.body;\nconst headers = item.headers;\n\nreturn {\n  // === LEAD ===\n  lead: {\n    nome:          body.name,\n    email:         body.email,\n    telefone:      body.cellphone,\n    pontos:        body.pontos_leads,\n    classificacao: body.classificacao,\n    data_envio:    body.data_envio,\n  },\n\n  // === RESPOSTAS DO FORMULÁRIO ===\n  // Mapeamento vigente do form atual (índices realinhados após a mudança do formulário).\n  respostas: {\n    tempo_que_conhece: body.resposta4,\n    situacao_atual: body.resposta5,\n    impacto_vida: body.resposta6,\n    tem_canal: body.resposta7,\n    tipo_conteudo: body.resposta11,\n    inscritos_canal: body.resposta8,\n    horas_por_semana: body.resposta12,\n    prontidao_mentoria: body.resposta13,\n    motivo_mentoria: body.resposta14,\n    por_que_escolhido: body.resposta15,\n    confirmacao_call: body.resposta16,\n  },\n\n  // === UTMs / TRÁFEGO ===\n  utm: {\n    source:       body.OCDM_utm_source,\n    medium:       body.OCDM_utm_medium,\n    campaign:     body.OCDM_utm_campaign,\n    content:      body.OCDM_utm_content,\n    term:         body.OCDM_utm_term,\n    url_completa: body.OCDM_url_window,\n  },\n\n  // === META / REQUEST ===\n  meta: {\n    ip:             headers[\"x-real-ip\"],\n    origem:         headers.origin,\n    user_agent:     headers[\"user-agent\"],\n    webhook_url:    item.webhookUrl,\n    execution_mode: item.executionMode,\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [464, -272],
+      "id": "ded4ab11-f9af-48bd-8ecb-d31b5b0ce709",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1M3B5pgTk1yLZhofUQFH_l9vTIAlxb5aejFnvfxpcNx0",
+          "mode": "list",
+          "cachedResultName": "Mestres do Algoritmo | OCDM - Planilhas Google",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1M3B5pgTk1yLZhofUQFH_l9vTIAlxb5aejFnvfxpcNx0/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 563141629,
+          "mode": "list",
+          "cachedResultName": "LEADS",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1M3B5pgTk1yLZhofUQFH_l9vTIAlxb5aejFnvfxpcNx0/edit#gid=563141629"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Data e Hora": "={{ DateTime.now().setZone('America/Sao_Paulo').setLocale('pt-BR').toFormat('dd/MM/yyyy - HH:mm') }}",
+            "Nome": "={{ $json.lead.nome }}",
+            "E-mail": "={{ $json.lead.email }}",
+            "CellPhone": "={{ $json.lead.telefone }}",
+            "MQL": "={{ $json.lead.classificacao }}",
+            "OCDM_utm_campaign": "={{ $json.utm.campaign }}",
+            "OCDM_utm_source": "={{ $json.utm.source }}",
+            "OCDM_utm_medium": "={{ $json.utm.medium }}",
+            "OCDM_utm_content": "={{ $json.utm.content }}",
+            "OCDM_utm_term": "={{ $json.utm.term }}",
+            "SOMA DE LEADS": "1",
+            "ORGANICO OU PAGO?": "={{ ['frio', 'quente'].includes($json.utm.term) ? 'pago' : $json.utm.term === 'organico' ? 'organico' : $json.utm.term }}",
+            "Data": "={{ DateTime.now().setZone('America/Sao_Paulo').setLocale('pt-BR').toFormat('dd/MM/yyyy') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Data e Hora", "displayName": "Data e Hora", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Data", "displayName": "Data", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Nome", "displayName": "Nome", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "CellPhone", "displayName": "CellPhone", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "E-mail", "displayName": "E-mail", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "MQL", "displayName": "MQL", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "CAPITAL NECESSÁRIO?", "displayName": "CAPITAL NECESSÁRIO?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": true },
+            { "id": "OCDM_utm_campaign", "displayName": "OCDM_utm_campaign", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "OCDM_utm_source", "displayName": "OCDM_utm_source", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "OCDM_utm_medium", "displayName": "OCDM_utm_medium", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "OCDM_utm_content", "displayName": "OCDM_utm_content", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "OCDM_utm_term", "displayName": "OCDM_utm_term", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "SOMA DE LEADS", "displayName": "SOMA DE LEADS", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "ORGANICO OU PAGO?", "displayName": "ORGANICO OU PAGO?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [624, -272],
+      "id": "7e44d39f-9076-4580-a4af-08752ecf4d84",
+      "name": "Leads",
+      "credentials": {
+        "googleApi": {
+          "id": "iY7iwEGMCfR9QnNp",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1M3B5pgTk1yLZhofUQFH_l9vTIAlxb5aejFnvfxpcNx0",
+          "mode": "list",
+          "cachedResultName": "Mestres do Algoritmo | OCDM - Planilhas Google",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1M3B5pgTk1yLZhofUQFH_l9vTIAlxb5aejFnvfxpcNx0/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1946617532,
+          "mode": "list",
+          "cachedResultName": "RESPOSTAS",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1M3B5pgTk1yLZhofUQFH_l9vTIAlxb5aejFnvfxpcNx0/edit#gid=1946617532"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Data e Hora": "={{ DateTime.now().setZone('America/Sao_Paulo').setLocale('pt-BR').toFormat('dd/MM/yyyy - HH:mm') }}",
+            "Data": "={{ DateTime.now().setZone('America/Sao_Paulo').setLocale('pt-BR').toFormat('dd/MM/yyyy') }}",
+            "Confirme o seu Nome?": "={{ $json.Nome }}",
+            "Confirme o seu E-mail?": "={{ $json['E-mail'] }}",
+            "(DDD)+Número do Whatsapp: Vamos te Chamar nesse Número!": "={{ $json.CellPhone }}",
+            "MQL": "={{ $json.MQL }}",
+            "Conhece?": "={{ $('Code in JavaScript').item.json.respostas.tempo_que_conhece }}",
+            "O que melhor descreve sua situação atual?": "={{ $('Code in JavaScript').item.json.respostas.situacao_atual }}",
+            "O que está acontecendo na sua vida agora que fez você buscar uma nova fonte de renda? Qual é o seu objetivo final?": "={{ $('Code in JavaScript').item.json.respostas.impacto_vida }}",
+            "Você já tem um canal no YouTube?": "={{ $('Code in JavaScript').item.json.respostas.tem_canal }}",
+            "Qual é o tipo de conteúdo que você quer produzir?": "={{ $('Code in JavaScript').item.json.respostas.tipo_conteudo }}",
+            "Quanto tempo por semana você consegue dedicar ao YouTube?": "={{ $('Code in JavaScript').item.json.respostas.horas_por_semana }}",
+            "Você está pronto para investir em um mentor que já monetiza vários canais com um plano personalizado para você?": "={{ $('Code in JavaScript').item.json.respostas.prontidao_mentoria }}",
+            "Porque você acredita que essa mentoria do Caio é a oportunidade para você crescer no YouTube?": "={{ $('Code in JavaScript').item.json.respostas.motivo_mentoria }}",
+            "Esse formulário é preenchido por diversas pessoas todos os dias, por que você acha que deve ser escolhido para a mentoria com o Caio?": "={{ $('Code in JavaScript').item.json.respostas.por_que_escolhido }}",
+            "A etapa final é uma reunião 100% GRATUITA com o Caio.": "={{ $('Code in JavaScript').item.json.respostas.confirmacao_call }}",
+            "UTM_SOURCE": "={{ $json.OCDM_utm_source }}",
+            "UTM_MEDIUM": "={{ $json.OCDM_utm_medium }}",
+            "UTM_CONTENT": "={{ $json.OCDM_utm_content }}",
+            "UTM_TERM": "={{ $json.OCDM_utm_term }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Data e Hora", "displayName": "Data e Hora", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Data", "displayName": "Data", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Confirme o seu Nome?", "displayName": "Confirme o seu Nome?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Confirme o seu E-mail?", "displayName": "Confirme o seu E-mail?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "(DDD)+Número do Whatsapp: Vamos te Chamar nesse Número!", "displayName": "(DDD)+Número do Whatsapp: Vamos te Chamar nesse Número!", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "MQL", "displayName": "MQL", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Conhece?", "displayName": "Conhece?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "O que melhor descreve sua situação atual?", "displayName": "O que melhor descreve sua situação atual?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "O que está acontecendo na sua vida agora que fez você buscar uma nova fonte de renda? Qual é o seu objetivo final?", "displayName": "O que está acontecendo na sua vida agora que fez você buscar uma nova fonte de renda? Qual é o seu objetivo final?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Você já tem um canal no YouTube?", "displayName": "Você já tem um canal no YouTube?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Se sim, o seu canal já está monetizado?", "displayName": "Se sim, o seu canal já está monetizado?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": true },
+            { "id": "Quantos inscritos você tem atualmente?", "displayName": "Quantos inscritos você tem atualmente?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": true },
+            { "id": "Quantos vídeos você posta por mês?", "displayName": "Quantos vídeos você posta por mês?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": true },
+            { "id": "Qual é o tipo de conteúdo que você quer produzir?", "displayName": "Qual é o tipo de conteúdo que você quer produzir?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Quanto tempo por semana você consegue dedicar ao YouTube?", "displayName": "Quanto tempo por semana você consegue dedicar ao YouTube?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Em quanto tempo você deseja monetizar seu canal?", "displayName": "Em quanto tempo você deseja monetizar seu canal?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": true },
+            { "id": "Você está pronto para investir em um mentor que já monetiza vários canais com um plano personalizado para você?", "displayName": "Você está pronto para investir em um mentor que já monetiza vários canais com um plano personalizado para você?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Porque você acredita que essa mentoria do Caio é a oportunidade para você crescer no YouTube?", "displayName": "Porque você acredita que essa mentoria do Caio é a oportunidade para você crescer no YouTube?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Esse formulário é preenchido por diversas pessoas todos os dias, por que você acha que deve ser escolhido para a mentoria com o Caio?", "displayName": "Esse formulário é preenchido por diversas pessoas todos os dias, por que você acha que deve ser escolhido para a mentoria com o Caio?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "A etapa final é uma reunião 100% GRATUITA com o Caio.", "displayName": "A etapa final é uma reunião 100% GRATUITA com o Caio.", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Você entendeu que essa é uma mentoria individualonde Caio e a equipe vai te ajudar pessoalmente a criar [...]", "displayName": "Você entendeu que essa é uma mentoria individualonde Caio e a equipe vai te ajudar pessoalmente a criar [...]", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": true },
+            { "id": "Quanto você acha que custa?", "displayName": "Quanto você acha que custa?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": true },
+            { "id": "Você confirma que a mentoria é para você, você tem o poder de decisão final e o valor de R$ 4.297 para garantir sua vaga e começar a sua transformação?", "displayName": "Você confirma que a mentoria é para você, você tem o poder de decisão final e o valor de R$ 4.297 para garantir sua vaga e começar a sua transformação?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": true },
+            { "id": "UTM_SOURCE", "displayName": "UTM_SOURCE", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "UTM_MEDIUM", "displayName": "UTM_MEDIUM", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "UTM_CONTENT", "displayName": "UTM_CONTENT", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "UTM_TERM", "displayName": "UTM_TERM", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "LEADS TOTAIS", "displayName": "LEADS TOTAIS", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [784, -272],
+      "id": "989293c3-249e-4744-a9bf-e2da10cfcd0d",
+      "name": "Pesquisa",
+      "credentials": {
+        "googleApi": {
+          "id": "iY7iwEGMCfR9QnNp",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "email": "={{ $json['Confirme o seu E-mail?'] }}",
+        "updateIfExists": true,
+        "additionalFields": {
+          "fieldValues": {
+            "property": [
+              { "field": "14", "value": "={{ $json.UTM_SOURCE }}" },
+              { "field": "15", "value": "={{ $json.UTM_MEDIUM }}" },
+              { "field": "18", "value": "={{ $json.UTM_CONTENT }}" },
+              { "field": "17", "value": "={{ $json.UTM_TERM }}" },
+              { "field": "8", "value": "={{ $json.Data }}" }
+            ]
+          },
+          "firstName": "={{ $json['Confirme o seu Nome?'] }}",
+          "phone": "={{ $json['(DDD)+Número do Whatsapp: Vamos te Chamar nesse Número!'] }}"
+        }
+      },
+      "type": "n8n-nodes-base.activeCampaign",
+      "typeVersion": 1,
+      "position": [944, -272],
+      "id": "f9d34f45-41e2-41e9-be1c-73321352ba9b",
+      "name": "Create a contact",
+      "credentials": {
+        "activeCampaignApi": {
+          "id": "RwvHaDJ1awc5o3gS",
+          "name": "ActiveCampaign account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "contactList",
+        "listId": 7,
+        "contactId": "={{ $json.id }}"
+      },
+      "type": "n8n-nodes-base.activeCampaign",
+      "typeVersion": 1,
+      "position": [1120, -272],
+      "id": "cb439e64-fd93-4510-9581-3ec2c8156f61",
+      "name": "Add a contact to a list",
+      "credentials": {
+        "activeCampaignApi": {
+          "id": "RwvHaDJ1awc5o3gS",
+          "name": "ActiveCampaign account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "contactTag",
+        "tagId": "56",
+        "contactId": "={{ $('Create a contact').item.json.id }}"
+      },
+      "type": "n8n-nodes-base.activeCampaign",
+      "typeVersion": 1,
+      "position": [1296, -272],
+      "id": "2602a932-f4a9-40ea-b1d0-ac7a653f5f09",
+      "name": "Add a contact tag",
+      "credentials": {
+        "activeCampaignApi": {
+          "id": "RwvHaDJ1awc5o3gS",
+          "name": "ActiveCampaign account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Code in JavaScript", "type": "main", "index": 0 }]] },
+    "Code in JavaScript": { "main": [[{ "node": "Leads", "type": "main", "index": 0 }]] },
+    "Leads": { "main": [[{ "node": "Pesquisa", "type": "main", "index": 0 }]] },
+    "Pesquisa": { "main": [[{ "node": "Create a contact", "type": "main", "index": 0 }]] },
+    "Create a contact": { "main": [[{ "node": "Add a contact to a list", "type": "main", "index": 0 }]] },
+    "Add a contact to a list": { "main": [[{ "node": "Add a contact tag", "type": "main", "index": 0 }]] }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "dea9a2fd766cd74cd9b3d41cdaf9e6263f7dbf6eeab05bea5a9bcdaae7ad3a9d"
+  },
+  "nodeGroups": [],
+  "tags": []
+}

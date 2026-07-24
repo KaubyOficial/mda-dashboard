@@ -1,0 +1,120 @@
+{
+  "name": "[FLUXO DE VENDAS] [VENDAS] [MDA] [OCDM] (CORRIGIDO 2026-07-23)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ocdm-vendas",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "id": "17125160-0e55-47fc-9cca-ac1a5ba28967",
+      "name": "Webhook",
+      "webhookId": "aa0aa2af-dfa6-4609-8cb3-a6deed6bf6e4"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "evento-compra-aprovada",
+              "leftValue": "={{ $json.body.event }}",
+              "rightValue": "purchase_approved",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [176, 0],
+      "id": "b3f1c2d4-7a21-4a5b-9c6d-2f8e01d4c9aa",
+      "name": "Só compra aprovada"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1M3B5pgTk1yLZhofUQFH_l9vTIAlxb5aejFnvfxpcNx0",
+          "mode": "list",
+          "cachedResultName": "Mestres do Algoritmo | OCDM - Planilhas Google",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1M3B5pgTk1yLZhofUQFH_l9vTIAlxb5aejFnvfxpcNx0/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 7064037,
+          "mode": "list",
+          "cachedResultName": "VENDAS",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1M3B5pgTk1yLZhofUQFH_l9vTIAlxb5aejFnvfxpcNx0/edit#gid=7064037"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Data": "={{ ($json.body.data.paidAt ? DateTime.fromISO($json.body.data.paidAt) : DateTime.now()).setZone('America/Sao_Paulo').toFormat('dd/MM/yyyy') }}",
+            "E-mail": "={{ $json.body.data.customer.email }}",
+            "Funil": "Aplicação",
+            "Status": "VENDA REALIZADA",
+            "Valor": "={{ Number($json.body.data.commissions && $json.body.data.commissions.length ? $json.body.data.commissions[0].totalAmount : $json.body.data.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}",
+            "SOMA DE LEADS": "1",
+            "Nome": "={{ $json.body.data.customer.name }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Data", "displayName": "Data", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Funil", "displayName": "Funil", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Status", "displayName": "Status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Nome", "displayName": "Nome", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "E-mail", "displayName": "E-mail", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Valor", "displayName": "Valor", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "SOMA DE LEADS", "displayName": "SOMA DE LEADS", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Mentores", "displayName": "Mentores", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [368, 0],
+      "id": "921e1cde-df64-4c14-9186-91564b98ac25",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleApi": {
+          "id": "iY7iwEGMCfR9QnNp",
+          "name": "Google Service Account account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Só compra aprovada", "type": "main", "index": 0 }]] },
+    "Só compra aprovada": { "main": [[{ "node": "Append row in sheet", "type": "main", "index": 0 }], []] },
+    "Append row in sheet": { "main": [[]] }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "dea9a2fd766cd74cd9b3d41cdaf9e6263f7dbf6eeab05bea5a9bcdaae7ad3a9d"
+  },
+  "nodeGroups": [],
+  "tags": []
+}
