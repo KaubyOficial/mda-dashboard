@@ -50,6 +50,7 @@ export interface AppConfig {
   authBypass: boolean;
   dbPath: string;
   utmMapPath: string;
+  vendaExclusionsPath: string;
 }
 
 export function loadConfig(): AppConfig {
@@ -92,6 +93,7 @@ export function loadConfig(): AppConfig {
     authBypass: env('AUTH_BYPASS', 'true') === 'true',
     dbPath: resolve(PROJECT_ROOT, 'data', 'mda.sqlite'),
     utmMapPath: resolve(PROJECT_ROOT, 'config', 'utm-map.json'),
+    vendaExclusionsPath: resolve(PROJECT_ROOT, 'config', 'vendas-exclusions.json'),
   };
 }
 

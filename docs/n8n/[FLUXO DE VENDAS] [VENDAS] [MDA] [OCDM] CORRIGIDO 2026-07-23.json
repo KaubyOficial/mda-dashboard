@@ -9,7 +9,10 @@
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "id": "17125160-0e55-47fc-9cca-ac1a5ba28967",
       "name": "Webhook",
       "webhookId": "aa0aa2af-dfa6-4609-8cb3-a6deed6bf6e4"
@@ -28,7 +31,19 @@
               "id": "evento-compra-aprovada",
               "leftValue": "={{ $json.body.event }}",
               "rightValue": "purchase_approved",
-              "operator": { "type": "string", "operation": "equals" }
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "produto-mentoria",
+              "leftValue": "={{ ($json.body.data && $json.body.data.product && $json.body.data.product.name) || '' }}",
+              "rightValue": "Mentoria",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
             }
           ],
           "combinator": "and"
@@ -37,9 +52,13 @@
       },
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [176, 0],
+      "position": [
+        176,
+        0
+      ],
       "id": "b3f1c2d4-7a21-4a5b-9c6d-2f8e01d4c9aa",
-      "name": "Só compra aprovada"
+      "name": "Só compra aprovada",
+      "notes": "Filtra evento purchase_approved E produto contendo Mentoria (payload Cakto: data.product.name). Sem o 2o filtro, compra aprovada de QUALQUER produto da conta viraria linha na aba VENDAS (caso real: linha de R$ 697,51 em 03/07/2026 que nao existe no export oficial da Mentoria)."
     },
     {
       "parameters": {
@@ -72,14 +91,78 @@
           },
           "matchingColumns": [],
           "schema": [
-            { "id": "Data", "displayName": "Data", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "Funil", "displayName": "Funil", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "Status", "displayName": "Status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "Nome", "displayName": "Nome", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "E-mail", "displayName": "E-mail", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "Valor", "displayName": "Valor", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "SOMA DE LEADS", "displayName": "SOMA DE LEADS", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "Mentores", "displayName": "Mentores", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+            {
+              "id": "Data",
+              "displayName": "Data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Funil",
+              "displayName": "Funil",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nome",
+              "displayName": "Nome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "E-mail",
+              "displayName": "E-mail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Valor",
+              "displayName": "Valor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "SOMA DE LEADS",
+              "displayName": "SOMA DE LEADS",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Mentores",
+              "displayName": "Mentores",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
           ],
           "attemptToConvertTypes": false,
           "convertFieldsToString": false
@@ -88,7 +171,10 @@
       },
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
-      "position": [368, 0],
+      "position": [
+        368,
+        0
+      ],
       "id": "921e1cde-df64-4c14-9186-91564b98ac25",
       "name": "Append row in sheet",
       "credentials": {
@@ -101,9 +187,34 @@
   ],
   "pinData": {},
   "connections": {
-    "Webhook": { "main": [[{ "node": "Só compra aprovada", "type": "main", "index": 0 }]] },
-    "Só compra aprovada": { "main": [[{ "node": "Append row in sheet", "type": "main", "index": 0 }], []] },
-    "Append row in sheet": { "main": [[]] }
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Só compra aprovada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Só compra aprovada": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        []
+      ]
+    }
   },
   "active": true,
   "settings": {

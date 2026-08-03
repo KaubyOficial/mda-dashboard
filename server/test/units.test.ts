@@ -244,6 +244,73 @@ test('parseVendaRows — une pagamento dividido (mesmo e-mail) e NÃO une nomes 
   assert.ok(warnings.some((w) => w.includes('divididas em 2+ linhas')));
 });
 
+test('parseVendaRows — CASO REAL jul/2026: exclusão + união = 15 vendas e R$ 60.418,64 (Gabriela 3×→1, Leonardo 2×→1)', () => {
+  const header = ['Data', 'Status', 'Nome', 'E-mail', 'Valor'];
+  const rows = [
+    header,
+    ['01/07/2026', 'VENDA REALIZADA', 'Lucas mota doria', 'comercialswatch@gmail.com', 'R$ 4.294,51'],
+    ['01/07/2026', 'VENDA REALIZADA', 'Leonardo Sacco Ribeiro', 'saccoleonardo96@icloud.com', 'R$ 2.179,89'],
+    ['01/07/2026', 'VENDA REALIZADA', 'Leonardo Sacco Ribeiro', 'saccoleonardo96@icloud.com', 'R$ 1.897,71'],
+    ['02/07/2026', 'VENDA REALIZADA', 'Felipe Gonçalves da Silva', 'felipe.lulu2833@gmail.com', 'R$ 4.080,09'],
+    ['03/07/2026', 'VENDA REALIZADA', 'Caio Augusto Roque Rodrigues', 'caio03062004@gmail.com', 'R$ 2.562,78'],
+    ['03/07/2026', 'VENDA REALIZADA', 'Luis Fernando de Oliveira Rosa', 'feeoliveira.rosa@gmail.com', 'R$ 697,51'],
+    ['07/07/2026', 'VENDA REALIZADA', 'Nathan Luis Aguilar Carlos Pereira', 'nathanluis@gmail.com', 'R$ 4.294,51'],
+    ['07/07/2026', 'VENDA REALIZADA', 'Edilson da Silva Braga Junior', 'edilson.silva00@hotmail.com', 'R$ 4.080,09'],
+    ['16/07/2026', 'VENDA REALIZADA', 'Davyd Pereira de Lima', 'davydmusico@gmail.com', 'R$ 3.997,51'],
+    ['16/07/2026', 'VENDA REALIZADA', 'Lucas Lopes Duarte', 'luca_slopesduarte@hotmail.com', 'R$ 4.294,51'],
+    ['17/07/2026', 'VENDA REALIZADA', 'roberto cesar de lima serrano', 'roberto.robertosonic@gmail.com', 'R$ 4.080,09'],
+    ['17/07/2026', 'VENDA REALIZADA', 'Jodson Santana Franco', 'jodson.s.franco@gmail.com', 'R$ 4.080,09'],
+    ['22/07/2026', 'VENDA REALIZADA', 'Roberta Oliveira Freitas Fong Yin', 'robertaf.yin@gmail.com', 'R$ 4.080,09'],
+    ['28/07/2026', 'VENDA REALIZADA', 'Endi Elua Souza Ouvidio', 'endiouvidio@yahoo.com', 'R$ 4.294,51'],
+    ['28/07/2026', 'VENDA REALIZADA', 'Gabriela', 'oigabizinha@outlook.com', 'R$ 1.297,51'],
+    ['29/07/2026', 'VENDA REALIZADA', 'Gabriela', 'oigabizinha@outlook.com', 'R$ 1.297,51'],
+    ['29/07/2026', 'VENDA REALIZADA', 'Gabriela', 'oigabizinha@outlook.com', 'R$ 1.609,83'],
+    ['31/07/2026', 'VENDA REALIZADA', 'Samuel Correa De Paula', 'samucacorrea@live.com', 'R$ 4.294,51'],
+    ['31/07/2026', 'VENDA REALIZADA', 'Rafael Ferreira Dias', 'rafaeldias05082002@gmail.com', 'R$ 3.702,90'],
+  ];
+  const warnings: string[] = [];
+  const vendas = parseVendaRows(rows, warnings, [
+    { data: '2026-07-03', email: 'feeoliveira.rosa@gmail.com', valorBRL: 697.51, motivo: 'não existe no Cakto' },
+  ]);
+  // 19 linhas − 1 fantasma = 18 transações Cakto → 15 compradores (Gabriela 3→1, Leonardo 2→1)
+  assert.equal(vendas.length, 15);
+  // faturamento EXATO do export oficial da Cakto (Σ líquido)
+  const total = vendas.reduce((s, v) => s + v.valorBRL, 0);
+  assert.equal(Math.round(total * 100), 6041864);
+  const gabriela = vendas.find((v) => v.emailKey === 'oigabizinha@outlook.com')!;
+  assert.equal(Math.round(gabriela.valorBRL * 100), 420485);
+  assert.ok(!vendas.some((v) => v.emailKey === 'feeoliveira.rosa@gmail.com'));
+});
+
+test('parseVendaRows — exclusão por reconciliação Cakto remove a linha certa e avisa; entrada obsoleta também avisa', () => {
+  const header = ['Data', 'Status', 'Nome', 'E-mail', 'Valor'];
+  const rows = [
+    header,
+    ['03/07/2026', 'VENDA REALIZADA', 'Luis Fernando de Oliveira Rosa', 'feeoliveira.rosa@gmail.com', 'R$ 697,51'],
+    ['03/07/2026', 'VENDA REALIZADA', 'Caio Augusto', 'caio@gmail.com', 'R$ 2.562,78'],
+  ];
+  const warnings: string[] = [];
+  const vendas = parseVendaRows(rows, warnings, [
+    { data: '2026-07-03', email: 'feeoliveira.rosa@gmail.com', valorBRL: 697.51, motivo: 'não existe no Cakto' },
+    { data: '2026-01-01', email: 'ninguem@x.com', valorBRL: 1, motivo: 'entrada obsoleta' },
+  ]);
+  assert.equal(vendas.length, 1);
+  assert.equal(vendas[0]!.emailKey, 'caio@gmail.com');
+  assert.ok(warnings.some((w) => w.includes('excluída') && w.includes('feeoliveira.rosa@gmail.com')));
+  assert.ok(warnings.some((w) => w.includes('não casaram') && w.includes('ninguem@x.com')));
+});
+
+test('parseVendaRows — exclusão exige data+e-mail+valor exatos (valor diferente NÃO exclui)', () => {
+  const header = ['Data', 'Status', 'Nome', 'E-mail', 'Valor'];
+  const rows = [header, ['03/07/2026', 'VENDA REALIZADA', 'Luis', 'feeoliveira.rosa@gmail.com', 'R$ 4.297,00']];
+  const warnings: string[] = [];
+  const vendas = parseVendaRows(rows, warnings, [
+    { data: '2026-07-03', email: 'feeoliveira.rosa@gmail.com', valorBRL: 697.51, motivo: 'x' },
+  ]);
+  assert.equal(vendas.length, 1); // valor não bate → linha fica
+  assert.ok(warnings.some((w) => w.includes('não casaram')));
+});
+
 test('chegouCadastro — lê a coluna manual do ACOMPANHAMENTO DIÁRIO (clique no botão da LP)', () => {
   const rows = [
     ['Data', 'Gasto', 'Leads', 'Cliques no Link', 'Impressões', 'VPG', 'Cliques no Botão', 'IniciouForms'],

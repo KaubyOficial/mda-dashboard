@@ -1,0 +1,11 @@
+{
+  "_doc": "Reconciliação da aba VENDAS contra o Cakto (fonte oficial). Cada entrada remove UMA linha da planilha que NÃO existe no export oficial da Cakto — sempre com data (ISO yyyy-mm-dd, igual à linha), e-mail, valor exato e motivo. O sync avisa quais entradas foram aplicadas e aponta entradas que não casam mais (linha já apagada da planilha) para limpeza. NUNCA usar para 'ajustar' número: só para linha comprovadamente inexistente no Cakto.",
+  "excluir": [
+    {
+      "data": "2026-07-03",
+      "email": "feeoliveira.rosa@gmail.com",
+      "valorBRL": 697.51,
+      "motivo": "Não existe no export oficial da Cakto (Mentoria, jul/2026, conferido 2026-08-03) — linha gravada pelo fluxo n8n antigo, que registra qualquer POST do webhook como VENDA REALIZADA sem filtrar evento/produto"
+    }
+  ]
+}

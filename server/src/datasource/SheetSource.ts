@@ -1,6 +1,7 @@
 import type { DataSource } from './DataSource.js';
 import type { DataSnapshot } from '../domain/entities.js';
 import type { UtmMap } from '../normalize/utm.js';
+import type { VendaExclusion } from '../normalize/leadRows.js';
 import {
   mergeAdsIntoDiaria,
   parseAgendamentoRows,
@@ -33,6 +34,8 @@ export interface SheetSourceOptions {
   tabs?: Record<string, string>;
   serviceAccountJsonPath?: string;
   utmMap: UtmMap;
+  /** Linhas de VENDAS que não existem no Cakto (reconciliação) — ver config/vendas-exclusions.json. */
+  vendaExclusions?: VendaExclusion[];
 }
 
 /** Chave interna → rótulo humano/nome de aba padrão (conforme docs/data-dictionary.md). */
@@ -166,7 +169,7 @@ export class SheetSource implements DataSource {
     if (!leadsRows) warnings.push('LEADS: gid não configurado.');
     const agendamentos = agRows ? parseAgendamentoRows(agRows, warnings) : [];
     if (!agRows) warnings.push('AGENDAMENTOS: gid não configurado — funil comercial parcial.');
-    const vendas = vRows ? parseVendaRows(vRows, warnings) : [];
+    const vendas = vRows ? parseVendaRows(vRows, warnings, this.opts.vendaExclusions ?? []) : [];
     if (!vRows) warnings.push('VENDAS: gid não configurado — faturamento = 0.');
     const midiaDiaria = mdRows ? parseMidiaDiariaRows(mdRows) : [];
     if (!mdRows) warnings.push('ACOMPANHAMENTO DIÁRIO: gid não configurado — investimento = 0.');

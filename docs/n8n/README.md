@@ -74,7 +74,15 @@ O texto abaixo fica como registro da investigação.
 **Fluxo de vendas** (`ocdm-vendas`):
 - **Sem filtro de evento**: qualquer POST vira "VENDA REALIZADA". Se a Cakto mandar
   `refund`/`chargeback`/pix gerado para o mesmo webhook, entra como venda.
-- `Data` = dia do processamento (`$today`), não a data do pagamento (`paidAt`).
+- **Sem filtro de produto**: compra aprovada de QUALQUER produto da conta Cakto viraria
+  linha na aba. **Caso real (achado 2026-08-03):** linha `03/07/2026 · Luis Fernando de
+  Oliveira Rosa · R$ 697,51` que NÃO existe no export oficial da Mentoria (18 transações ·
+  R$ 60.418,64 em jul/2026) — inflava o faturamento do dashboard em R$ 697,51. O JSON
+  corrigido desta pasta agora filtra também `data.product.name` contém "Mentoria"
+  (2ª condição no nó IF). Enquanto o fluxo corrigido não é importado, o dashboard exclui a
+  linha via `config/vendas-exclusions.json` (reconciliação explícita, com warning).
+- `Data` = dia do processamento (`$today`), não a data do pagamento (`paidAt`) — por isso
+  vendas pagas 14/07/2026 (Davyd, Lucas Lopes) estão na aba como 16/07.
 - `Valor` = `commissions[0].totalAmount` = **líquido** após taxas Cakto (ex.: 844,51 de um
   pagamento de 847,99). O histórico da aba já é assim (consistente), mas fica documentado:
   o "faturamento" do dashboard é o líquido Cakto.
@@ -117,7 +125,18 @@ O texto abaixo fica como registro da investigação.
 4. No fluxo de vendas: o webhook da Cakto já deve estar apontando para
    `.../webhook/ocdm-vendas`; confirmar no painel da Cakto (Configurações → Webhooks) e
    conferir quais **eventos** estão marcados (o filtro novo segura, mas o certo é enviar
-   só `purchase_approved`).
+   só `purchase_approved`) e quais **produtos** (o webhook da Cakto aceita escopo por
+   produto — marcar só a Mentoria; o filtro novo por `data.product.name` segura de
+   qualquer forma).
+   ⚠️ Depois de importar o fluxo corrigido, apagar da planilha a linha fantasma
+   `03/07/2026 · Luis Fernando de Oliveira Rosa · R$ 697,51` (aba VENDAS, linha 202 em
+   03/08/2026) e remover a entrada correspondente de `config/vendas-exclusions.json` do
+   dashboard (o sync avisa quando ela ficar obsoleta).
+   ⚠️ **Reembolso/chargeback**: se uma venda aprovada for reembolsada depois, a Cakto tira
+   ela do dashboard oficial, mas a linha fica na aba → divergência nova. O fluxo corrigido
+   não trata (o webhook manda `refund`/`chargeback`, mas atualizar linha existente por
+   e-mail+valor no Sheets via n8n é frágil); se acontecer, registrar a linha em
+   `config/vendas-exclusions.json` com motivo "reembolsada".
 5. **Service account**: os fluxos corrigidos usam a credencial "Google Service Account
    account" (a mesma que o fluxo novo de leads já usa com sucesso desde 22/07). Ela precisa
    de **Editor** na planilha. ⚠️ A SA do *dashboard* (`mda-dashboard@…`) deve continuar

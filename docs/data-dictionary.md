@@ -71,8 +71,11 @@ Precedência do pago×orgânico no código (`mapPagoOrganico`): coluna `ORGANICO
 ## VENDAS
 
 `0 Data · 2 Status · 3 Nome · 4 E-mail · 5 Valor · 7 Mentores`. **Só nome/valor confiáveis** (casa por nome; e-mail parcial).
-- Só `Status = VENDA REALIZADA` conta (203). **Valor real** por venda (§4 D7): formato `R$ 4.297,00` (⚠️ há `R$ 1000,00` sem separador de milhar — parser trata).
+- Só `Status = VENDA REALIZADA` conta (203). **Valor real** por venda (§4 D7): formato `R$ 4.297,00` (⚠️ há `R$ 1000,00` sem separador de milhar — parser trata). O valor é o **líquido Cakto** (`commissions[0].totalAmount` do webhook), não o valor pago pelo cliente.
 - **Reconciliação ao centavo:** Σ Valor = **R$ 819.622,40** (bate com o cálculo manual na planilha). Ticket médio R$ 4.037,55.
+- **Contagem = 1 COMPRADOR = 1 venda** (decisão Kauê 2026-07-17, **reconfirmada 2026-08-03**): pagamento dividido (metade pix/metade cartão, parcelas — mesmo e-mail em ≤60 dias) gera 2+ linhas e é **unido numa venda só**, somando o valor. ⚠️ Por design a contagem fica MENOR que a "Quantidade de vendas" da Cakto, que conta cada transação — jul/2026: Cakto mostra **18 transações**, dashboard mostra **15 compradores** (Gabriela 3×→1, Leonardo 2×→1); o **faturamento bate ao centavo** (R$ 60.418,64) porque a união só soma, não descarta.
+- **Reconciliação contra o Cakto (`config/vendas-exclusions.json`):** linha da aba que comprovadamente NÃO existe no export oficial da Cakto (o fluxo n8n antigo grava qualquer POST do webhook como VENDA REALIZADA, sem filtro de evento/produto) é excluída por entrada explícita `{data ISO, email, valorBRL, motivo}` — nunca por heurística. Toda exclusão aplicada vira warning no sync; entrada que não casa mais (linha já apagada da planilha) também vira warning pedindo limpeza. Caso real: `2026-07-03 · feeoliveira.rosa@gmail.com · R$ 697,51`.
+- ⚠️ **Data da linha = dia do PROCESSAMENTO no fluxo n8n antigo** (`$today`), não o `paidAt` — ex.: vendas pagas em 14/07/2026 (Davyd, Lucas Lopes) estão na aba como 16/07. Totais mensais batem com a Cakto, mas o gráfico diário pode deslocar 1–2 dias até o fluxo corrigido (que usa `paidAt`) ser importado.
 
 ## ACOMPANHAMENTO DIÁRIO (mídia diária)
 

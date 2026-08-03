@@ -139,8 +139,33 @@ export function parseAgendamentoRows(rows: string[][], warnings: string[]): Agen
 // ─────────────────────────────────────────── VENDAS ──────────────────────────────────────────
 const STATUS_VENDA = 'VENDA REALIZADA';
 
-/** Aba VENDAS. Só Status VENDA REALIZADA conta. Valor real. Sem e-mail/telefone confiável → casamento por nome. */
-export function parseVendaRows(rows: string[][], warnings: string[]): Venda[] {
+/**
+ * Linha da aba VENDAS que NÃO existe no Cakto (fonte oficial) e deve ficar fora do dashboard.
+ * Mantidas em config/vendas-exclusions.json, uma a uma, com motivo — nunca por heurística.
+ * Caso real: o fluxo n8n antigo grava QUALQUER POST do webhook como "VENDA REALIZADA"
+ * (sem filtro de evento nem de produto), então a aba pode ter linhas que não são venda
+ * paga da Mentoria. A reconciliação é contra o export oficial da Cakto.
+ */
+export interface VendaExclusion {
+  /** Data da linha na planilha, em ISO (yyyy-mm-dd). */
+  data: string;
+  email: string;
+  valorBRL: number;
+  motivo: string;
+}
+
+/**
+ * Aba VENDAS. Só Status VENDA REALIZADA conta. Valor real (líquido Cakto).
+ * 1 COMPRADOR = 1 venda (decisão Kauê 2026-07-17, reconfirmada 2026-08-03): pagamento
+ * dividido (metade pix/metade cartão, parcelas) aparece em 2+ linhas e é UNIDO numa venda
+ * só. Por isso a contagem fica MENOR que a "Quantidade de vendas" da Cakto, que conta cada
+ * transação — o faturamento bate ao centavo, a contagem é por cliente de propósito.
+ */
+export function parseVendaRows(
+  rows: string[][],
+  warnings: string[],
+  exclusions: VendaExclusion[] = [],
+): Venda[] {
   if (rows.length < 2) return [];
   const col = colFinder(rows[0]!);
   const iDate = col('Data', 'Data da Venda', 'Data e Hora');
@@ -164,7 +189,45 @@ export function parseVendaRows(rows: string[][], warnings: string[]): Venda[] {
     });
   }
   if (iValor === undefined) warnings.push('VENDAS: coluna Valor não encontrada — faturamento = 0.');
-  return dedupeSplitPayments(out, warnings);
+  // Exclusões PRIMEIRO (a linha fantasma não pode nem entrar num grupo de pagamento dividido).
+  const kept = applyVendaExclusions(out, exclusions, warnings);
+  return dedupeSplitPayments(kept, warnings);
+}
+
+/** Remove as linhas listadas na config de reconciliação, com aviso auditável (nunca silencioso). */
+function applyVendaExclusions(
+  vendas: Venda[],
+  exclusions: VendaExclusion[],
+  warnings: string[],
+): Venda[] {
+  if (exclusions.length === 0) return vendas;
+  const matches = (v: Venda, e: VendaExclusion): boolean =>
+    v.date === e.data &&
+    v.emailKey === normalizeEmail(e.email) &&
+    Math.abs(v.valorBRL - e.valorBRL) < 0.005;
+
+  const removed: string[] = [];
+  const kept = vendas.filter((v) => {
+    const hit = exclusions.find((e) => matches(v, e));
+    if (!hit) return true;
+    removed.push(`${v.date} ${v.emailKey || v.nameKey} R$ ${v.valorBRL.toFixed(2)} (${hit.motivo})`);
+    return false;
+  });
+
+  if (removed.length > 0) {
+    warnings.push(
+      `VENDAS: ${removed.length} linha(s) excluída(s) por reconciliação com a Cakto (config/vendas-exclusions.json): ${removed.join('; ')}.`,
+    );
+  }
+  const unused = exclusions.filter((e) => !vendas.some((v) => matches(v, e)));
+  if (unused.length > 0) {
+    warnings.push(
+      `VENDAS: ${unused.length} exclusão(ões) de config/vendas-exclusions.json não casaram com nenhuma linha (já removidas da planilha?) — pode apagar da config: ${unused
+        .map((e) => `${e.data} ${e.email}`)
+        .join('; ')}.`,
+    );
+  }
+  return kept;
 }
 
 /** Janela p/ tratar 2+ vendas do mesmo cliente como pagamento dividido/parcelado (em dias). */
@@ -178,7 +241,8 @@ function daysApart(a: string, b: string): number {
  * Une pagamentos divididos: o MESMO cliente (mesmo e-mail) aparecendo em 2+ linhas de VENDA
  * próximas no tempo é UMA venda paga em partes (ex.: metade cartão / metade pix, ou parcelas),
  * não vendas separadas. Soma os valores e mantém a data da 1ª parte. Sem isso a contagem de
- * vendas e o ticket médio ficam inflados.
+ * vendas e o ticket médio ficam inflados. (A Cakto conta cada transação — por isso a
+ * "Quantidade de vendas" de lá é maior; decisão do Kauê: aqui é por cliente.)
  *
  * Regra de segurança: linhas SEM e-mail NUNCA são unidas — a aba VENDAS traz só o primeiro nome
  * em muitos casos (Lucas, Rafael, Daniel…) e primeiros nomes iguais são pessoas diferentes, cada
