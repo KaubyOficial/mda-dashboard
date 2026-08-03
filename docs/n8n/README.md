@@ -116,12 +116,28 @@ O texto abaixo fica como registro da investigação.
 
 1. **Importar os 2 JSONs** desta pasta no n8n (Workflows → Import from File), ou aplicar as
    mesmas mudanças direto nos fluxos vivos (são pequenas — ver §4).
-2. No fluxo de leads novo importado: conferir que o path continua `mentoria-cadastro`
-   (produção). **Um path só pode estar ativo em UM workflow** — desativar o antigo antes de
-   ativar o importado, na ordem: ativa o novo → testa com um envio real do form → aí sim.
-3. **Desativar o fluxo velho** (`mentoria-cadastro2`) DEPOIS de confirmar na plataforma do
-   formulário que nenhuma página/variante ainda posta nele (checar TODAS as versões do
-   quiz, inclusive a da LP paga — suspeita central do §2).
+2. **Webhook path do fluxo de leads — AJUSTAR ANTES DE ATIVAR** (achado 2026-08-03: o
+   export real do fluxo ATIVO escuta em `mentoria-cadastro2`, não `mentoria-cadastro` como
+   este JSON corrigido assume). Se ativar o corrigido sem ajustar, ele escuta numa URL que
+   o form não usa e **nenhum lead entra**. Como corrigir (opção A, recomendada — não mexe
+   no form):
+   a. Importar o JSON corrigido (fica INATIVO por padrão);
+   b. Abrir o workflow importado → clicar 2× no nó **Webhook** → campo **Path** → trocar
+      `mentoria-cadastro` por **`mentoria-cadastro2`** → Save;
+   c. **Um path só pode estar ativo em UM workflow por vez** → desativar o fluxo atual
+      (toggle Active OFF) e IMEDIATAMENTE ativar o corrigido (janela de segundos sem
+      receptor; fazer em horário de pouco tráfego);
+   d. Testar com um envio real do form e conferir a linha nova na aba LEADS.
+   Opção B (se preferir migrar a URL): manter `mentoria-cadastro` no corrigido, ativar,
+   e trocar a URL do webhook NA PLATAFORMA DO FORM para
+   `https://webhook.envious.com.br/webhook/mentoria-cadastro` em TODAS as variantes/
+   páginas do quiz (inclusive a da LP paga) — só desativar o fluxo antigo depois de
+   confirmar que leads chegam pelo path novo.
+3. Se usou a opção A do item 2, este passo já aconteceu (o corrigido assumiu o path
+   `mentoria-cadastro2`). Se usou a opção B: **desativar o fluxo velho** DEPOIS de
+   confirmar na plataforma do formulário que nenhuma página/variante ainda posta em
+   `mentoria-cadastro2` (checar TODAS as versões do quiz, inclusive a da LP paga —
+   suspeita central do §2).
 4. No fluxo de vendas: o webhook da Cakto já deve estar apontando para
    `.../webhook/ocdm-vendas`; confirmar no painel da Cakto (Configurações → Webhooks) e
    conferir quais **eventos** estão marcados (o filtro novo segura, mas o certo é enviar
