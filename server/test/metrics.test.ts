@@ -244,6 +244,24 @@ test('KPI CPL — mini-métrica "só pago" usa só os leads pagos no denominador
   near(cpl.sub!.value, 100); // 400 ÷ 4 leads pagos (L3 orgânico sai do denominador)
 });
 
+test('KPI Leads — valor principal é o total e a mini-métrica traz só os pagos', () => {
+  const r = computeMetrics(fixture(), MARCO, META);
+  const leads = kpi(r, 'leads');
+  assert.equal(leads.value, 5); // todos (4 pagos + L3 orgânico)
+  assert.ok(leads.sub, 'Leads deveria trazer a mini-métrica "só pago"');
+  assert.equal(leads.sub!.label, 'só pago');
+  assert.equal(leads.sub!.format, 'number');
+  assert.equal(leads.sub!.value, 4); // L1, L2, L4, L5
+});
+
+test('KPI Leads "só pago" — sem lead pago no período é 0 (contagem real, não "—")', () => {
+  const f = fixture();
+  f.leads = f.leads.map((l) => ({ ...l, pagoOrganico: 'organico' as const }));
+  const leads = kpi(computeMetrics(f, MARCO, META), 'leads');
+  assert.equal(leads.value, 5);
+  assert.equal(leads.sub!.value, 0); // zero pago é um fato, não um denominador indefinido
+});
+
 test('KPI CPL "só pago" — sem lead pago no período vira null (não NaN/Infinity)', () => {
   const f = fixture();
   f.leads = f.leads.map((l) => ({ ...l, pagoOrganico: 'organico' as const }));

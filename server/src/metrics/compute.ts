@@ -86,7 +86,15 @@ function computeKpis(cur: BaseAgg, prev: BaseAgg): Kpi[] {
     kpi('investimento', 'Investimento', cur.investimento, prev.investimento, 'currency', 'down', 'Σ gasto diário de mídia'),
     kpi('lucro', 'Lucro', cur.lucro, prev.lucro, 'currency', 'up', 'Faturamento − Investimento'),
     kpi('vendas', 'Vendas', cur.nVendas, prev.nVendas, 'number', 'up', 'nº de vendas no período'),
-    kpi('leads', 'Leads', cur.leadsTotal, prev.leadsTotal, 'number', 'up', 'nº de leads no período'),
+    {
+      ...kpi('leads', 'Leads (todos)', cur.leadsTotal, prev.leadsTotal, 'number', 'up', 'nº de leads no período (pagos + orgânicos)'),
+      sub: {
+        label: 'só pago',
+        value: cur.leadsPago,
+        format: 'number',
+        formula: 'nº de leads vindos do tráfego pago (o orgânico sai da conta)',
+      },
+    },
     kpi('cpm', 'CPM', cpm ?? 0, cpmPrev ?? 0, 'currency', 'down', 'Investimento ÷ Impressões × 1.000'),
     {
       ...kpi('cpl', 'CPL (todos)', cplTodos ?? 0, cplTodosPrev ?? 0, 'currency', 'down', 'Investimento ÷ Leads totais (pagos + orgânicos)'),
