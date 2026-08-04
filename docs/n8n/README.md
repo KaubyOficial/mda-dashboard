@@ -1,8 +1,16 @@
-# n8n — Diagnóstico e correção dos fluxos da planilha OCDM (2026-07-23)
+# n8n — Diagnóstico e correção dos fluxos da planilha OCDM (2026-07-23, atualizado 2026-08-03)
 
 Investigação disparada por: *"um dos dias teve 44 leads pagos, 54 respostas no formulário,
 e na lista de leads não tem nenhum"*. Tudo abaixo foi medido na **planilha real**
 (`1M3B5pg…`, via service account read-only do dashboard) e nos **exports reais** dos fluxos n8n.
+
+> **Atualização 2026-08-03 — o fluxo de vendas passa a gravar o TELEFONE do comprador.** O
+> arquivo desta pasta virou `[FLUXO DE VENDAS] … CORRIGIDO 2026-08-03.json`: o nó *Append row
+> in sheet* mapeia `data.customer.phone` na coluna **`Phone`** (col. I da aba VENDAS, criada
+> pelo Kauê em 03/08). É o que permite casar venda↔lead quando o comprador usou no checkout um
+> e-mail diferente do formulário — hoje **4 das 15 vendas de jul/2026** ficam sem lead casado
+> (aparecem como "fora dos funis pago/orgânico" no dashboard) exatamente por isso. Ver §4 e
+> passo 4 do checklist.
 
 ## O que foi encontrado (fatos medidos, não hipóteses)
 
@@ -86,6 +94,18 @@ O texto abaixo fica como registro da investigação.
 - `Valor` = `commissions[0].totalAmount` = **líquido** após taxas Cakto (ex.: 844,51 de um
   pagamento de 847,99). O histórico da aba já é assim (consistente), mas fica documentado:
   o "faturamento" do dashboard é o líquido Cakto.
+- **Não gravava o TELEFONE** do comprador (corrigido em 2026-08-03). O payload da Cakto traz
+  `data.customer.phone` (confirmado no n8n numa execução real; formato `55DD9XXXXXXXX` = 55 +
+  DDD + 9 dígitos) e agora ele vai para a coluna **`Phone`** (col. I da aba VENDAS). **Por que
+  importa:** o `E-mail` da aba é o do CHECKOUT e só casa com a aba LEADS quando o comprador
+  usou o mesmo e-mail do formulário — medido em 03/08 no dado real: **69 de 207** vendas do
+  histórico casam por e-mail, **63 por nome** (frágil: a LEADS guarda muitas vezes só o
+  primeiro nome) e **75 não casam com nada**; em jul/2026, 11 de 15 por e-mail e **4 órfãs**.
+  O telefone é a chave que o checkout e o formulário realmente compartilham. **Prova real
+  (2026-08-03):** peguei o telefone de uma execução real do webhook, canonizei e ele existe na
+  aba LEADS — 2 submissões do mesmo comprador, 28 e 30/07, e a venda dele é de 31/07. ⚠️ **Só
+  vale daqui pra frente** — as 4 vendas órfãs de julho não têm telefone gravado na aba e
+  seguem órfãs até rodar o backfill (§7).
 - Usa OAuth (mesmo risco de expirar).
 
 ### 5. Outros achados
@@ -110,7 +130,43 @@ O texto abaixo fica como registro da investigação.
 ### 6. Dashboard (já corrigido e testado neste repo)
 `mapPagoOrganico` agora entende `quente`/`frio` na coluna `ORGANICO OU PAGO?` → `pago`
 (server/src/normalize/utm.ts). Antes já caía certo pelo fallback de `utm_source`
-(FacebookADS→pago), mas agora não depende disso. Lint · typecheck · **51 testes** verdes.
+(FacebookADS→pago), mas agora não depende disso.
+
+**2026-08-03 — o dashboard já lê a coluna `Phone`** (`parseVendaRows` em
+server/src/normalize/leadRows.ts): coluna OPCIONAL, canonizada por `normalizePhone` (tira o
+`55`, tira o nono dígito → DDD + 8, igual à chave da aba LEADS/AGENDAMENTOS); ausente ou vazia
+= comportamento anterior. O casamento venda↔lead (`crossjoin/match.ts`) já tentava
+e-mail → telefone → nome, então **nada mais precisa mudar no código** quando o fluxo começar a
+gravar. Numa venda com pagamento dividido, o telefone sobrevive à união mesmo se a 1ª parcela
+for anterior à coluna. Lint · typecheck · **68 testes** verdes (3 novos, incl. o caso
+"e-mail do checkout é outro, nome não bate, casa pelo telefone").
+
+### 7. Backfill retroativo da coluna `Phone` (2026-08-03)
+
+O fluxo corrigido só grava telefone das vendas **novas**. Para o histórico existe uma
+ferramenta dedicada: `server/src/cli/backfillVendasPhone.ts`, alimentada pelo **export oficial
+da Cakto** (o CSV do painel traz `Telefone do Cliente` em 100% das transações).
+
+```
+npm run backfill:phone --workspace server -- --csv "<export.csv>"           # dry-run (padrão)
+npm run backfill:phone --workspace server -- --csv "<export.csv>" --apply   # grava na planilha
+```
+
+- Casa a linha da planilha com a do export **pelo e-mail** (o mesmo comprador tem o mesmo
+  telefone em todas as parcelas). E-mail com 2 telefones diferentes no export = conflito,
+  pulado. Linha sem e-mail é reportada, nunca adivinhada por nome.
+- Escreve **só** na coluna `Phone`, célula a célula; **nunca sobrescreve** célula preenchida
+  (divergência vira relatório); rodar 2× não duplica nada.
+- ⚠️ Exige que a service account tenha **Editor** na planilha (a do dashboard é Leitor de
+  propósito — promover, rodar, voltar para Leitor). O cliente Sheets do dashboard continua
+  read-only; o escopo de escrita existe só nesta ferramenta.
+- **Medido com o export de julho/2026:** 18 células a preencher (a linha fantasma 202 é pulada
+  sozinha, porque não existe no export) e **3 das 4 vendas órfãs passam a casar** com um lead
+  (a 4ª comprou sem nunca ter preenchido o formulário — o telefone dela não existe na aba
+  LEADS, só na AGENDAMENTOS).
+- ⚠️ **Para estender ao histórico de 2025 o casamento por e-mail NÃO serve**: 103 das 214
+  linhas da aba VENDAS (todas de 2025) estão **sem e-mail nenhum**. Vai precisar de outra
+  chave (nome + data + valor contra o export do período).
 
 ## Como aplicar (checklist)
 
@@ -144,6 +200,12 @@ O texto abaixo fica como registro da investigação.
    só `purchase_approved`) e quais **produtos** (o webhook da Cakto aceita escopo por
    produto — marcar só a Mentoria; o filtro novo por `data.product.name` segura de
    qualquer forma).
+   ⚠️ **Coluna `Phone` (col. I da aba VENDAS)**: já criada em 03/08. O JSON corrigido desta
+   pasta grava `data.customer.phone` nela; se preferir aplicar à mão no fluxo vivo, é só
+   adicionar o campo **Phone** no nó *Append row in sheet* com o valor
+   `={{ $json.body.data.customer.phone || '' }}`. Depois de importar, conferir a PRIMEIRA
+   venda nova: a célula I tem que sair como `55DDDXXXXXXXXX`. Não renomear a coluna — o
+   dashboard procura por `Phone` (aceita também `Telefone`/`CellPhone`/`Celular`/`Whatsapp`).
    ⚠️ Depois de importar o fluxo corrigido, apagar da planilha a linha fantasma
    `03/07/2026 · Luis Fernando de Oliveira Rosa · R$ 697,51` (aba VENDAS, linha 202 em
    03/08/2026) e remover a entrada correspondente de `config/vendas-exclusions.json` do

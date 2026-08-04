@@ -54,7 +54,11 @@ function findLead(
 }
 
 /**
- * Casa agendamentos (e-mail→telefone→nome) e vendas (nome, único disponível na aba VENDAS) aos leads.
+ * Casa agendamentos e vendas aos leads pela mesma cadeia: e-mail → telefone → nome.
+ * Na aba VENDAS o e-mail é o do CHECKOUT: casa quando o comprador usou o mesmo do formulário,
+ * senão não casa com nada. O telefone (coluna `Phone`, escrita pelo n8n desde 2026-08-03) é o
+ * que resgata esses casos — linhas anteriores à coluna não têm telefone e seguem caindo em
+ * nome/não atribuído.
  * Venda sem lead casado → bucket "não atribuído": entra no faturamento total, fora dos segmentos (§2.4).
  */
 export function enrichLeads(snap: DataSnapshot): MatchResult {

@@ -6,6 +6,7 @@ import { classifyByAnswers, normalizeConhece } from '../src/normalize/qualificat
 import { previousRange, validateRange, RangeError, daysInclusive } from '../src/metrics/period.js';
 import { enrichLeads } from '../src/crossjoin/match.js';
 import { adCode, publicoSlug } from '../src/crossjoin/attribution.js';
+import { columnLetter } from '../src/datasource/sheetsApi.js';
 import { mapOrigem, mapPagoOrganico, mapTemperatura, type UtmMap } from '../src/normalize/utm.js';
 import {
   parseLeadRows,
@@ -180,6 +181,81 @@ test('enrichLeads — vendas casam por nome (aba VENDAS só tem nome) + não atr
   const r2 = enrichLeads(f);
   assert.equal(r2.report.unmatched, 1);
   assert.equal(r2.unattributedVendas[0]!.valorBRL, 999);
+});
+
+test('enrichLeads — venda casa por TELEFONE quando o e-mail do checkout é outro e o nome não bate', () => {
+  // Caso real das vendas "não atribuídas": a Cakto grava o e-mail do checkout (diferente do
+  // e-mail do formulário) e o nome COMPLETO, enquanto a aba LEADS guarda só o primeiro nome.
+  // Antes da coluna Phone essa venda era irrecuperável; agora casa pelo telefone canônico.
+  const f = fixture();
+  const lead = f.leads[0]!;
+  f.vendas.push({
+    id: 'V-PHONE',
+    date: '2026-03-08',
+    emailKey: 'outro-email-do-checkout@gmail.com',
+    phoneKey: lead.phoneKey,
+    nameKey: 'nome completo que nao existe na aba leads',
+    valorBRL: 4297,
+  });
+  const r = enrichLeads(f);
+  assert.equal(r.report.byPhone, 1);
+  assert.equal(r.report.unmatched, 0);
+  assert.equal(r.enriched.find((l) => l.id === lead.id)!.temVenda, true);
+});
+
+test('parseVendaRows — lê a coluna Phone (canoniza 55/nono dígito) e fica vazia quando a coluna não existe', () => {
+  // header real da aba VENDAS depois de 2026-08-03 (coluna I = "Phone")
+  const header = ['Data', 'Funil', 'Status', 'Nome', 'E-mail', 'Valor', 'SOMA DE LEADS', 'Mentores', 'Phone'];
+  const rows = [
+    header,
+    // formato que a Cakto manda em `customer.phone`: 55 + DDD + 9 dígitos → chave canônica DDD + 8
+    ['31/07/2026', 'Aplicação', 'VENDA REALIZADA', 'Comprador Exemplo', 'r@gmail.com', 'R$ 3.702,90', '1', '', '5574912345678'],
+    // formatado à mão na planilha
+    ['31/07/2026', 'Aplicação', 'VENDA REALIZADA', 'Outro', 'o@gmail.com', 'R$ 100,00', '1', '', '(11) 99999-0001'],
+    // linha antiga, anterior à coluna (célula vazia) → sem telefone, casamento segue por e-mail/nome
+    ['01/07/2026', 'Aplicação', 'VENDA REALIZADA', 'Antigo', 'a@gmail.com', 'R$ 100,00', '1', '', ''],
+  ];
+  const warnings: string[] = [];
+  const vendas = parseVendaRows(rows, warnings);
+  assert.equal(vendas.find((v) => v.emailKey === 'r@gmail.com')!.phoneKey, '7412345678');
+  assert.equal(vendas.find((v) => v.emailKey === 'o@gmail.com')!.phoneKey, '1199990001');
+  assert.equal(vendas.find((v) => v.emailKey === 'a@gmail.com')!.phoneKey, '');
+
+  // aba sem a coluna (histórico) → nenhum telefone, e nada quebra
+  const semColuna = parseVendaRows(
+    [
+      ['Data', 'Status', 'Nome', 'E-mail', 'Valor'],
+      ['01/07/2026', 'VENDA REALIZADA', 'Antigo', 'a@gmail.com', 'R$ 100,00'],
+    ],
+    warnings,
+  );
+  assert.equal(semColuna[0]!.phoneKey, '');
+});
+
+test('parseVendaRows — na união de pagamento dividido o telefone sobrevive mesmo se a 1ª parte não tiver', () => {
+  // parcela paga antes da coluna Phone existir + parcela paga depois: a venda unida fica com o telefone
+  const header = ['Data', 'Status', 'Nome', 'E-mail', 'Valor', 'Phone'];
+  const rows = [
+    header,
+    ['01/07/2026', 'VENDA REALIZADA', 'Leonardo', 'leo@icloud.com', 'R$ 2.179,89', ''],
+    ['05/07/2026', 'VENDA REALIZADA', 'Leonardo', 'leo@icloud.com', 'R$ 1.897,71', '5511999990001'],
+  ];
+  const warnings: string[] = [];
+  const vendas = parseVendaRows(rows, warnings);
+  assert.equal(vendas.length, 1);
+  assert.equal(vendas[0]!.date, '2026-07-01'); // data da 1ª parte, como antes
+  assert.equal(Math.round(vendas[0]!.valorBRL * 100), 407760);
+  assert.equal(vendas[0]!.phoneKey, '1199990001');
+});
+
+test('columnLetter — índice 0-based vira letra A1 (a coluna Phone é a I)', () => {
+  // errar isso escreveria o telefone NA COLUNA ERRADA da planilha do cliente
+  assert.equal(columnLetter(0), 'A');
+  assert.equal(columnLetter(8), 'I'); // Phone, aba VENDAS
+  assert.equal(columnLetter(25), 'Z');
+  assert.equal(columnLetter(26), 'AA');
+  assert.equal(columnLetter(51), 'AZ');
+  assert.equal(columnLetter(52), 'BA');
 });
 
 test('adCode — casa utm_content do lead com o nome do anúncio da aba', () => {

@@ -155,7 +155,8 @@ export interface VendaExclusion {
 }
 
 /**
- * Aba VENDAS. Só Status VENDA REALIZADA conta. Valor real (líquido Cakto).
+ * Aba VENDAS. Só Status VENDA REALIZADA conta. Valor real (líquido Cakto). Chaves de
+ * casamento: e-mail → telefone (coluna `Phone`, opcional) → nome.
  * 1 COMPRADOR = 1 venda (decisão Kauê 2026-07-17, reconfirmada 2026-08-03): pagamento
  * dividido (metade pix/metade cartão, parcelas) aparece em 2+ linhas e é UNIDO numa venda
  * só. Por isso a contagem fica MENOR que a "Quantidade de vendas" da Cakto, que conta cada
@@ -172,6 +173,11 @@ export function parseVendaRows(
   const iStatus = col('Status');
   const iName = col('Nome');
   const iEmail = col('E-mail', 'Email');
+  // Coluna OPCIONAL (criada 2026-08-03, preenchida pelo fluxo n8n com `data.customer.phone`
+  // do webhook da Cakto). É a ÚNICA chave que o checkout e o formulário compartilham de fato:
+  // o e-mail da Cakto costuma ser outro e a aba LEADS guarda muitas vezes só o primeiro nome.
+  // Ausente/vazia → phoneKey '' e o casamento segue como antes (e-mail → nome).
+  const iPhone = col('Phone', 'Telefone', 'CellPhone', 'Celular', 'Whatsapp', 'WhatsApp');
   const iValor = col('Valor', 'Valor da Venda', 'Faturamento');
   const out: Venda[] = [];
   for (let r = 1; r < rows.length; r++) {
@@ -183,7 +189,7 @@ export function parseVendaRows(
       id: `v-${r}`,
       date,
       emailKey: normalizeEmail(get(row, iEmail)),
-      phoneKey: '',
+      phoneKey: normalizePhone(get(row, iPhone)),
       nameKey: normalizeName(get(row, iName)),
       valorBRL: parseMoneyBRL(get(row, iValor)) ?? 0,
     });
@@ -278,7 +284,10 @@ export function dedupeSplitPayments(vendas: Venda[], warnings: string[]): Venda[
       }
       const first = run[0]!;
       const valor = run.reduce((s, x) => s + x.valorBRL, 0);
-      out.push({ ...first, valorBRL: valor }); // mantém id/chaves/data da 1ª parte, soma o valor
+      // mantém id/chaves/data da 1ª parte e soma o valor; o telefone vem da 1ª parte que TIVER
+      // um (parcela antiga sem a coluna Phone não pode apagar o telefone de uma parte posterior).
+      const phoneKey = first.phoneKey || run.find((x) => x.phoneKey)?.phoneKey || '';
+      out.push({ ...first, phoneKey, valorBRL: valor });
       merges.push(`${first.nameKey || first.emailKey} (${run.length}× = R$ ${valor.toFixed(2)})`);
     };
     for (let i = 1; i < rows.length; i++) {

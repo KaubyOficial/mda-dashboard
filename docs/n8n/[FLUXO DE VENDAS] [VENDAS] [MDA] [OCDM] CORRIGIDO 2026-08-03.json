@@ -1,5 +1,5 @@
 {
-  "name": "[FLUXO DE VENDAS] [VENDAS] [MDA] [OCDM] (CORRIGIDO 2026-07-23)",
+  "name": "[FLUXO DE VENDAS] [VENDAS] [MDA] [OCDM] (CORRIGIDO 2026-08-03)",
   "nodes": [
     {
       "parameters": {
@@ -87,7 +87,8 @@
             "Status": "VENDA REALIZADA",
             "Valor": "={{ Number($json.body.data.commissions && $json.body.data.commissions.length ? $json.body.data.commissions[0].totalAmount : $json.body.data.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}",
             "SOMA DE LEADS": "1",
-            "Nome": "={{ $json.body.data.customer.name }}"
+            "Nome": "={{ $json.body.data.customer.name }}",
+            "Phone": "={{ $json.body.data.customer.phone || '' }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -157,6 +158,15 @@
             {
               "id": "Mentores",
               "displayName": "Mentores",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
               "required": false,
               "defaultMatch": false,
               "display": true,

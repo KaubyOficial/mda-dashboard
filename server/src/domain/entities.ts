@@ -21,7 +21,10 @@ export interface UtmSet {
 /**
  * Chaves de cruzamento normalizadas (§5.2) — nunca expostas na API.
  * Realidade das abas: LEADS tem e-mail+telefone+nome · AGENDAMENTOS tem telefone+nome (sem e-mail)
- * · VENDAS tem só nome. Por isso o casamento usa e-mail → telefone → nome (fallbacks).
+ * · VENDAS tem nome + e-mail do CHECKOUT (casa quando o comprador usou o mesmo e-mail do
+ * formulário — medido 2026-08-03: 69 de 207 vendas do histórico; quando ele usou outro, o e-mail
+ * não casa com nada) e, desde 2026-08-03, a coluna `Phone` do webhook da Cakto — a chave que
+ * sobra quando e-mail e nome falham. Casamento: e-mail → telefone → nome (fallbacks).
  */
 export interface MatchKeys {
   emailKey: string; // lowercase + trim

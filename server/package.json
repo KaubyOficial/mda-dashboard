@@ -10,7 +10,8 @@
     "start": "node --experimental-sqlite dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --experimental-sqlite --import tsx/esm --test --test-reporter spec test/units.test.ts test/metrics.test.ts test/db.test.ts test/sheetapi.test.ts",
-    "sync": "node --experimental-sqlite --import tsx/esm src/cli/sync.ts"
+    "sync": "node --experimental-sqlite --import tsx/esm src/cli/sync.ts",
+    "backfill:phone": "node --experimental-sqlite --import tsx/esm src/cli/backfillVendasPhone.ts"
   },
   "dependencies": {
     "@fastify/rate-limit": "^10.2.1",
