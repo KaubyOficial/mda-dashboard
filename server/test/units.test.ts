@@ -206,6 +206,40 @@ test('enrichLeads — venda casa por TELEFONE quando o e-mail do checkout é out
   assert.equal(r.enriched.find((l) => l.id === lead.id)!.temVenda, true);
 });
 
+test('enrichLeads — casamento por NOME exige lead anterior à venda (venda velha não gruda em lead novo)', () => {
+  // Caso real (2026-08-12): venda de 26/09/2025 da aba, só com o primeiro nome e sem e-mail
+  // nem telefone, casava com um lead homônimo criado em 10/08/2026 — 11 meses DEPOIS — e
+  // aparecia dentro dos segmentos de agosto/2026. Medido: 26 de 148 vendas casadas eram assim.
+  const f = fixture();
+  const homonimo = (id: string, date: string, emailKey: string) => ({
+    ...f.leads[0]!,
+    id,
+    date,
+    emailKey,
+    phoneKey: '',
+    nameKey: 'nome repetido',
+  });
+  f.leads.push(homonimo('L9', '2026-08-10', 'homonimo1@x.test'));
+  f.vendas.push({ id: 'V-VELHA', date: '2025-09-26', emailKey: '', phoneKey: '', nameKey: 'nome repetido', valorBRL: 3997 });
+  const r = enrichLeads(f);
+  assert.equal(r.enriched.find((l) => l.id === 'L9')!.temVenda, false, 'lead nasceu depois da venda');
+  assert.equal(r.report.unmatched, 1);
+  assert.equal(r.report.nomeRejeitadoPorData.vendas, 1, 'a rejeição é contada p/ virar warning');
+  assert.equal(r.unattributedVendas[0]!.id, 'V-VELHA', 'vai pro balde não-atribuído, não some do faturamento');
+
+  // e o caminho normal continua funcionando: mesma pessoa, venda DEPOIS do lead
+  f.vendas.push({ id: 'V-NOVA', date: '2026-08-11', emailKey: '', phoneKey: '', nameKey: 'nome repetido', valorBRL: 4297 });
+  const r2 = enrichLeads(f);
+  assert.equal(r2.enriched.find((l) => l.id === 'L9')!.temVenda, true);
+  assert.equal(r2.enriched.find((l) => l.id === 'L9')!.valorVendaBRL, 4297);
+
+  // homônimos: vence o primeiro da aba que JÁ EXISTIA na data da venda
+  f.leads.push(homonimo('L10', '2025-01-05', 'homonimo2@x.test'));
+  const r3 = enrichLeads(f);
+  assert.equal(r3.enriched.find((l) => l.id === 'L10')!.temVenda, true, 'a venda de 2025 casa com o lead de 2025');
+  assert.equal(r3.report.unmatched, 0);
+});
+
 test('parseVendaRows — lê a coluna Phone (canoniza 55/nono dígito) e fica vazia quando a coluna não existe', () => {
   // header real da aba VENDAS depois de 2026-08-03 (coluna I = "Phone")
   const header = ['Data', 'Funil', 'Status', 'Nome', 'E-mail', 'Valor', 'SOMA DE LEADS', 'Mentores', 'Phone'];

@@ -77,6 +77,7 @@ Precedência do pago×orgânico no código (`mapPagoOrganico`): coluna `ORGANICO
 
 - **Coluna `Phone` (col. I) — criada 2026-08-03**, preenchida pelo fluxo n8n de vendas com `data.customer.phone` do webhook da Cakto (formato `55DD9XXXXXXXX` = 55 + DDD + 9 dígitos; `normalizePhone` canoniza para DDD + 8). É **OPCIONAL** no parser: linha antiga com a célula vazia → sem telefone, casamento segue como era. **Por que ela existe:** o e-mail da aba é o do CHECKOUT — casa só quando o comprador usou o mesmo e-mail do formulário (medido 2026-08-03: **69 de 207** vendas do histórico; jul/2026 **11 de 15**) — e o nome da LEADS é muitas vezes só o primeiro (ambíguo, 6–56 candidatos). O telefone é a chave que resgata o resto. **Vale só daqui pra frente**: as 4 vendas de jul/2026 sem lead casado (lucas mota doria · caio augusto roque rodrigues · roberto cesar de lima serrano · roberta oliveira freitas fong yin) não têm telefone gravado e continuam órfãs.
 - Ordem de casamento venda↔lead: **e-mail → telefone → nome** (`crossjoin/match.ts`).
+- ⚠️ **O fallback por NOME tem guarda de data (2026-08-12):** só casa com lead que **já existia na data do evento**. E-mail e telefone são identidade forte e casam sempre; nome não é — nas linhas de 2025 a aba traz só o primeiro nome e a venda grudava no primeiro homônimo da aba, às vezes um lead criado meses DEPOIS. Medido no dado real: **26 de 148** vendas casadas eram assim, e uma delas (venda de 26/09/2025) aparecia dentro dos segmentos de agosto/2026. Venda sem lead elegível vai pro balde "não atribuído" — faturamento e contagem de vendas não mudam (são por data), só a atribuição a segmento.
 - **Backfill retroativo aplicado em 2026-08-03** (`npm run backfill:phone`, a partir do export oficial da Cakto): 173 das 214 linhas já têm telefone. Sobram sem: 36 linhas de 2025 sem e-mail e sem casamento único no export, 1 ambígua e 4 cujo e-mail não existe no export. Detalhes e método em `docs/n8n/README.md § 7`.
 - ⚠️ **O `Valor` mudou de significado ao longo do tempo:** nas linhas de 2025 (sem e-mail) ele é o **preço do produto** (`Valor Base do Produto` da Cakto); nas linhas gravadas pelo fluxo n8n atual é a **comissão líquida** (`commissions[0].totalAmount`). Isso importa para qualquer reconciliação contra export: usar a chave errada não casa nada.
 - Só `Status = VENDA REALIZADA` conta (203). **Valor real** por venda (§4 D7): formato `R$ 4.297,00` (⚠️ há `R$ 1000,00` sem separador de milhar — parser trata). O valor é o **líquido Cakto** (`commissions[0].totalAmount` do webhook), não o valor pago pelo cliente.
@@ -152,20 +153,22 @@ tinha: `00 - IG Visitou 7D - AD54 - AD56 | AD58 - AD60` → `00 - IG Visitou 7D`
 o `publicoSlug()` não casaria com o `utm_medium` do lead.
 
 **Funil vem da CAMPANHA, não do anúncio.** `[OCDM]` = o funil que este dashboard mede;
-`[C2]` = funil de qualificação (fora da V1); sem tag = `outro` (duas campanhas de
-DISTRIBUIÇÃO/RECONHECIMENTO de 10/09/25, R$ 699,85 no total). Só o funil de `META_FUNIL`
-entra. ⚠️ **`adCode()` não distingue funil**: existem `AD02 [OCDM]` e `AD02 [C2]` e o UTM só
-carrega o número (`video-ad02`) — por isso o filtro é por campanha, antes do cruzamento.
+`[C2]` = funil de qualificação; sem tag = `outro` (duas campanhas de
+DISTRIBUIÇÃO/RECONHECIMENTO de 10/09/25, R$ 699,85 no total). São **dois recortes
+diferentes**: os RELATÓRIOS por anúncio/público seguem só `META_FUNIL` (ocdm), e o
+INVESTIMENTO do dia soma `META_FUNIS_GASTO` (**ocdm,c2** desde 2026-08-12). ⚠️ **`adCode()`
+não distingue funil**: existem `AD02 [OCDM]` e `AD02 [C2]` e o UTM só carrega o número
+(`video-ad02`) — por isso o C2 nunca entra nos relatórios, só no gasto.
 
 **Precedência** (`server/src/datasource/MetaSource.ts`):
 
 1. **Anúncios e públicos:** a **aba vence** no dia em que ela tem dado; a Meta só preenche
    os dias que faltam (24/06/2026 em diante). O histórico reconciliado não é tocado.
-2. **Investimento/impressões/cliques do dia:** a **Meta vence**, com o gasto **só do OCDM**.
-   Medido em 2026-08-06: a coluna `Gasto` da ACOMPANHAMENTO é o total da **CONTA** (bate à
-   vírgula com a API em 35 de 36 dias de 01/07–05/08), enquanto o dashboard conta leads e
-   vendas só do OCDM. `alcance` continua da aba — reach é deduplicado, não é somável.
-   Desligável com `META_APPLY_SPEND=false`.
+2. **Investimento/impressões/cliques do dia:** a **Meta vence**, somando **OCDM + C2**
+   (`META_FUNIS_GASTO`). Medido em 2026-08-06: a coluna `Gasto` da ACOMPANHAMENTO é o total
+   da **CONTA** (bate à vírgula com a API em 35 de 36 dias de 01/07–05/08); fica de fora só
+   o que não tem tag de funil. `alcance` continua da aba — reach é deduplicado, não é
+   somável. Desligável com `META_APPLY_SPEND=false` (aí volta o total da aba).
 3. **LP view / 3s video por dia:** sempre agregados dos anúncios (`mergeAdsIntoDiaria`).
 
 **Efeito da mudança (medido contra o cache anterior):** total histórico R$ 68.014,81 →
@@ -174,8 +177,8 @@ R$ 2.087,26 + outras R$ 699,85). O saldo é positivo porque a aba também tinha 
 (08/04/2026 estava zerada e a conta gastou R$ 281,47) e porque em set–out/2025 a aba
 registrava só parte das campanhas OCDM (as ADV+ ficavam de fora).
 
-⚠️ **Inconsistência conhecida, não resolvida por decisão de escopo:** leads gerados por
-anúncio do C2 **continuam contando** como lead pago (jul/2026: 12 de 116, `utm_medium =
-ig-envolvimento-30d`). Com o gasto do C2 fora, o CPL "só pago" de julho fica R$ 8,33; se
-esses leads também saíssem, seria R$ 9,29. Mudar isso mexe na contagem de leads do
-dashboard inteiro — decisão do Kauê.
+**2026-08-12 — o C2 voltou pro investimento (decisão do Kauê).** Os leads gerados por
+anúncio do C2 sempre contaram como lead pago na aba LEADS (jul/2026: 12 de 116, `utm_medium
+= ig-envolvimento-30d`); com o gasto do C2 fora, o numerador do CPL era de um recorte e o
+denominador de outro. Agora os dois lados incluem o C2 e os meses anteriores voltam a bater
+com o gerenciador. Reverter = `META_FUNIS_GASTO=ocdm`.

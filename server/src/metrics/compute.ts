@@ -564,13 +564,19 @@ export function computeMetrics(
   meta: ComputeMeta,
   preset?: string,
 ): MetricsResponse {
-  const { enriched, agendamentosComLead, vendasComLead } = enrichLeads(snap);
+  const { enriched, agendamentosComLead, vendasComLead, report } = enrichLeads(snap);
   const prevRange = previousRange(range, preset);
   const cur = baseAgg(enriched, snap, range);
   const prev = baseAgg(enriched, snap, prevRange);
   const warnings: string[] = [...meta.extraWarnings, ...snap.warnings];
   const midiaGap = midiaCoverageWarning(snap, range);
   if (midiaGap) warnings.push(midiaGap);
+  const rej = report.nomeRejeitadoPorData;
+  if (rej.vendas + rej.agendamentos > 0) {
+    warnings.push(
+      `ATRIBUIÇÃO: ${rej.vendas} venda(s) e ${rej.agendamentos} agendamento(s) tinham homônimo na aba LEADS, mas o lead foi criado DEPOIS do evento — não atribuímos por nome nesse caso (a aba LEADS só começa em 2025-08-20). Eles entram em "não atribuído"; faturamento e contagem de vendas não mudam.`,
+    );
+  }
 
   return {
     range,

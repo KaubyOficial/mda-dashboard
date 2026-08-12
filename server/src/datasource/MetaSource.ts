@@ -20,11 +20,13 @@ import { MetaStore } from './metaStore.js';
  *     e TOP PÚBLICOS pararam em 2026-06-23; a Meta preenche de 24/06 em diante sem tocar no
  *     histórico que já estava reconciliado.
  *
- *  b) INVESTIMENTO DIÁRIO: a Meta VENCE, com o gasto só do funil OCDM. Motivo medido: a
- *     coluna Gasto da ACOMPANHAMENTO é o total da CONTA (OCDM + C2 + campanhas antigas de
- *     distribuição) — bate à vírgula com a API em 35 de 36 dias de 01/07–05/08 — enquanto o
- *     dashboard só conta leads/vendas do OCDM. Impressões e cliques vêm junto, senão CPM e
- *     CPC ficariam com denominador de um funil e numerador de outro.
+ *  b) INVESTIMENTO DIÁRIO: a Meta VENCE, somando OCDM + C2 (`funisGasto`, decisão do Kauê em
+ *     2026-08-12 — antes era só OCDM). Motivo medido: a coluna Gasto da ACOMPANHAMENTO é o
+ *     total da CONTA (OCDM + C2 + campanhas antigas de distribuição) — bate à vírgula com a
+ *     API em 35 de 36 dias de 01/07–05/08 — e os leads do C2 caem na MESMA aba LEADS,
+ *     contando como lead pago; sobra de fora só o que não tem tag de funil nenhuma.
+ *     Impressões e cliques vêm junto, senão CPM e CPC ficariam com denominador de um recorte
+ *     e numerador de outro.
  *     `alcance` continua vindo da aba: reach é deduplicado, não é somável por anúncio.
  *
  *  c) LP views / 3s video: sempre da Meta via mergeAdsIntoDiaria (a aba nunca teve).
@@ -42,8 +44,10 @@ export interface MetaSourceOptions {
   refreshDays: number;
   /** dias por requisição — o backfill inteiro não cabe num pedido só */
   chunkDays?: number;
-  /** funil mantido — 'ocdm' por decisão de escopo da V1 */
+  /** funil dos relatórios por anúncio/público — 'ocdm' por decisão de escopo da V1 */
   funil: Funil;
+  /** funis somados no investimento diário — default OCDM + C2 (ver buildMetaMedia) */
+  funisGasto?: Funil[];
   /** se false, o gasto diário continua vindo da aba (total da conta) */
   applySpend: boolean;
   storePath: string;
@@ -79,6 +83,12 @@ export class MetaSource implements DataSource {
     this.name = `${opts.base.name} + meta`;
   }
 
+  /** Funis somados no investimento diário; sem a opção, OCDM + C2 (default de 2026-08-12). */
+  private funisGasto(): Funil[] {
+    const f = this.opts.funisGasto;
+    return f && f.length > 0 ? f : ['ocdm', 'c2'];
+  }
+
   /** Repuxa a janela recente (ou o histórico todo, se o cache estiver vazio) e devolve o cache. */
   private async refreshStore(warnings: string[]): Promise<MetaMediaResult> {
     const store = new MetaStore(this.opts.storePath, this.client.accountId);
@@ -112,7 +122,12 @@ export class MetaSource implements DataSource {
     store.replaceWindow('adset', since, until, toFacts(adsetRows));
     store.save();
 
-    return buildMetaMedia(store.facts('ad'), store.facts('adset'), this.opts.funil);
+    return buildMetaMedia(
+      store.facts('ad'),
+      store.facts('adset'),
+      this.opts.funil,
+      this.funisGasto(),
+    );
   }
 
   /** Confere moeda e fuso: número certo em moeda errada é o pior tipo de erro silencioso. */
@@ -196,11 +211,21 @@ export class MetaSource implements DataSource {
         deltaGasto += m.investimentoBRL;
         trocados++;
       }
-      const fora = media.split.gastoPorFunil.c2 + media.split.gastoPorFunil.outro;
+      const incluidos = this.funisGasto();
+      const todos: Funil[] = ['ocdm', 'c2', 'outro'];
+      const rotulo = (f: Funil): string =>
+        f === 'outro' ? 'campanhas sem tag' : f.toUpperCase();
+      const dentro = incluidos
+        .map((f) => `${rotulo(f)} ${brl(media.split.gastoPorFunil[f])}`)
+        .join(' + ');
+      const excluidos = todos.filter((f) => !incluidos.includes(f));
+      const fora = excluidos.reduce((s, f) => s + media.split.gastoPorFunil[f], 0);
       warnings.push(
-        `META: investimento diário recalculado só com o funil ${this.opts.funil.toUpperCase()} em ${trocados} dia(s) (${brl(deltaGasto)} vs. o total da conta que a aba trazia). Ficaram DE FORA ${brl(fora)}: C2 ${brl(media.split.gastoPorFunil.c2)} + outras campanhas ${brl(media.split.gastoPorFunil.outro)}.`,
+        `META: investimento diário recalculado em ${trocados} dia(s) com ${dentro} (${brl(deltaGasto)} vs. o total da conta que a aba trazia). Ficaram DE FORA ${brl(fora)}: ${excluidos
+          .map((f) => `${rotulo(f)} ${brl(media.split.gastoPorFunil[f])}`)
+          .join(' + ')}.`,
       );
-      if (media.split.campanhasOutro.length > 0) {
+      if (!incluidos.includes('outro') && media.split.campanhasOutro.length > 0) {
         warnings.push(
           `META: campanhas sem tag [OCDM]/[C2] (não entram em nenhum funil): ${media.split.campanhasOutro.join(' | ')}.`,
         );

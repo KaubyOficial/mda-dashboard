@@ -33,6 +33,7 @@ function withMeta(base: DataSource, cfg: AppConfig): DataSource {
     refreshDays: cfg.meta.refreshDays,
     chunkDays: cfg.meta.chunkDays,
     funil: cfg.meta.funil,
+    funisGasto: cfg.meta.funisGasto,
     applySpend: cfg.meta.applySpend,
     storePath: cfg.meta.storePath,
   });

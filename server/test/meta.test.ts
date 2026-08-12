@@ -9,6 +9,7 @@ import {
   classifyFunil,
   normalizeAdsetName,
   toFacts,
+  type Funil,
   type MetaFact,
 } from '../src/normalize/metaRows.js';
 import { MetaStore } from '../src/datasource/metaStore.js';
@@ -110,7 +111,7 @@ const fact = (p: Partial<MetaFact>): MetaFact => ({
   ...p,
 });
 
-test('buildMetaMedia — C2 e campanha sem tag ficam de fora, e o gasto delas é reportado', () => {
+test('buildMetaMedia — C2 fica fora dos RELATÓRIOS mas entra no gasto do dia; sem tag fica fora dos dois', () => {
   const ads = [
     fact({
       investimentoBRL: 23.8,
@@ -136,7 +137,28 @@ test('buildMetaMedia — C2 e campanha sem tag ficam de fora, e o gasto delas é
   assert.equal(r.split.gastoPorFunil.c2, 21.13);
   assert.equal(r.split.gastoPorFunil.outro, 5);
   assert.deepEqual(r.split.campanhasOutro, [CAMP_OUTRO]);
-  assert.equal(r.diaria.get('2026-07-01')?.investimentoBRL, 23.8, 'diária só conta OCDM');
+  assert.equal(
+    r.diaria.get('2026-07-01')?.investimentoBRL,
+    44.93,
+    'diária = OCDM + C2 (23,80 + 21,13); a campanha sem tag (R$ 5) fica fora',
+  );
+});
+
+test('buildMetaMedia — funisGasto=[ocdm] volta ao gasto só do OCDM', () => {
+  const ads = [
+    fact({ investimentoBRL: 23.8, impressoes: 1000, cliques: 10 }),
+    fact({
+      campaign: CAMP_C2,
+      ad: 'AD02 [C2] [VID] QUALIFICAÇÃO',
+      investimentoBRL: 21.13,
+      impressoes: 500,
+      cliques: 4,
+    }),
+  ];
+  const r = buildMetaMedia(ads, [], 'ocdm', ['ocdm']);
+  assert.equal(r.diaria.get('2026-07-01')?.investimentoBRL, 23.8);
+  assert.equal(r.diaria.get('2026-07-01')?.impressoes, 1000, 'impressões acompanham o gasto');
+  assert.equal(r.diaria.get('2026-07-01')?.cliques, 10);
 });
 
 test('buildMetaMedia — mesmo anúncio em 2 conjuntos soma numa linha só; público normaliza', () => {
@@ -453,6 +475,7 @@ function makeSource(
   adRows: MetaInsightRow[],
   adsetRows: MetaInsightRow[],
   applySpend = true,
+  funisGasto?: Funil[],
 ): MetaSource {
   const dir = mkdtempSync(join(tmpdir(), 'mda-metasrc-'));
   return new MetaSource({
@@ -462,6 +485,7 @@ function makeSource(
     since: '2026-06-01',
     refreshDays: 35,
     funil: 'ocdm',
+    funisGasto,
     applySpend,
     storePath: join(dir, 'meta-insights.json'),
     client: fakeClient(adRows, adsetRows),
@@ -486,12 +510,13 @@ test('MetaSource — a aba VENCE no dia em que ela tem anúncio; a Meta só pree
           { action_type: 'lead', value: '2' },
         ],
       }),
-      // C2 no mesmo dia: entra no gasto da conta, mas não no funil
+      // C2 no mesmo dia: entra no gasto do dia, mas nunca no relatório por anúncio
       metaRow({
         date_start: '2026-07-01',
         campaign_name: CAMP_C2,
         ad_name: 'AD02 [C2]',
         spend: '21.13',
+        impressions: '500',
       }),
     ],
     [
@@ -522,9 +547,9 @@ test('MetaSource — a aba VENCE no dia em que ela tem anúncio; a Meta só pree
   const d0701 = snap.midiaDiaria.find((d) => d.date === '2026-07-01');
   assert.equal(d0701?.cliquesBotaoLP, 5);
   assert.equal(d0701?.vslPlays, 100);
-  // e o gasto do dia vira SÓ OCDM (era 44,93 = 23,80 OCDM + 21,13 C2)
-  assert.equal(d0701?.investimentoBRL, 23.8);
-  assert.equal(d0701?.impressoes, 1000);
+  // e o gasto do dia = OCDM + C2 (23,80 + 21,13), com impressões acompanhando (1000 + 500)
+  assert.equal(d0701?.investimentoBRL, 44.93);
+  assert.equal(d0701?.impressoes, 1500);
 
   // dia coberto pela aba de mídia mas SEM linha na Meta mantém o que a aba trazia
   const d0623 = snap.midiaDiaria.find((d) => d.date === '2026-06-23');
@@ -533,6 +558,32 @@ test('MetaSource — a aba VENCE no dia em que ela tem anúncio; a Meta só pree
   assert.ok(
     snap.warnings.some((w) => w.includes('investimento diário recalculado')),
     'a troca do gasto tem que ser declarada em warning',
+  );
+});
+
+test('MetaSource — META_FUNIS_GASTO=ocdm tira o C2 do investimento do dia', async () => {
+  const src = makeSource(
+    [
+      metaRow({ date_start: '2026-07-01', spend: '23.80', impressions: '1000' }),
+      metaRow({
+        date_start: '2026-07-01',
+        campaign_name: CAMP_C2,
+        ad_name: 'AD02 [C2]',
+        spend: '21.13',
+        impressions: '500',
+      }),
+    ],
+    [metaRow({ date_start: '2026-07-01', ad_name: '', spend: '23.80' })],
+    true,
+    ['ocdm'],
+  );
+  const snap = await src.fetchAll();
+  const d = snap.midiaDiaria.find((x) => x.date === '2026-07-01');
+  assert.equal(d?.investimentoBRL, 23.8);
+  assert.equal(d?.impressoes, 1000);
+  assert.ok(
+    snap.warnings.some((w) => w.includes('Ficaram DE FORA') && w.includes('C2')),
+    'o que ficou de fora tem que estar declarado no warning',
   );
 });
 

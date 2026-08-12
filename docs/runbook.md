@@ -156,8 +156,9 @@ META_AD_ACCOUNT_ID=1695002784410550   # só dígitos; o act_ é adicionado pelo 
 META_SINCE=2024-12-01            # 1º dia do backfill (a Meta guarda ~37 meses)
 META_REFRESH_DAYS=35             # janela repuxada a cada sync (atribuição muda ~28 dias)
 META_CHUNK_DAYS=92               # dias por requisição
-META_FUNIL=ocdm                  # funil medido pelo dashboard
-META_APPLY_SPEND=true            # investimento do dia = só o funil acima
+META_FUNIL=ocdm                  # funil dos RELATÓRIOS por anúncio/público
+META_FUNIS_GASTO=ocdm,c2         # funis somados no INVESTIMENTO do dia (2026-08-12)
+META_APPLY_SPEND=true            # false = investimento volta a ser o total da aba
 ```
 
 - **1º sync = backfill** de `META_SINCE` até hoje (~90 s, ~2,3 MB em `data/meta-insights.json`).

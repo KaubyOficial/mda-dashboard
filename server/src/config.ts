@@ -71,9 +71,15 @@ export interface MetaConfig {
   refreshDays: number;
   /** dias por requisição (o backfill inteiro não cabe num pedido só) */
   chunkDays: number;
-  /** funil mantido: 'ocdm' | 'c2' | 'outro' */
+  /** funil dos RELATÓRIOS por anúncio/público: 'ocdm' | 'c2' | 'outro' */
   funil: Funil;
-  /** recalcular o investimento diário só com o funil acima (tira C2 do CPL/CAC/ROAS) */
+  /**
+   * funis somados no INVESTIMENTO diário (gasto/impressões/cliques). Default `ocdm,c2`
+   * desde 2026-08-12: os leads do C2 caem na mesma aba LEADS e contam como pago, então o
+   * gasto dele precisa estar no numerador do CPL. Campanha sem tag continua fora.
+   */
+  funisGasto: Funil[];
+  /** recalcular o investimento diário com os funis acima (senão fica o total da conta, da aba) */
   applySpend: boolean;
   storePath: string;
 }
@@ -137,9 +143,24 @@ function loadMetaConfig(): MetaConfig {
     refreshDays: Number(env('META_REFRESH_DAYS', '35')),
     chunkDays: Number(env('META_CHUNK_DAYS', '92')),
     funil: env('META_FUNIL', 'ocdm') as Funil,
+    funisGasto: parseFunis(env('META_FUNIS_GASTO', 'ocdm,c2')),
     applySpend: env('META_APPLY_SPEND', 'true') !== 'false',
     storePath: resolve(PROJECT_ROOT, 'data', 'meta-insights.json'),
   };
+}
+
+/**
+ * `META_FUNIS_GASTO=ocdm,c2` → ['ocdm','c2']. Valor desconhecido é ignorado (nunca vira
+ * funil no chute) e lista vazia cai no default OCDM — investimento zerado por typo no .env
+ * seria erro silencioso.
+ */
+function parseFunis(raw: string): Funil[] {
+  const validos: Funil[] = ['ocdm', 'c2', 'outro'];
+  const out = raw
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter((s): s is Funil => (validos as string[]).includes(s));
+  return out.length > 0 ? [...new Set(out)] : ['ocdm'];
 }
 
 export function readJson<T>(path: string): T {
