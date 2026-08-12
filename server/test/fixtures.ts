@@ -27,6 +27,7 @@ export function fixture(): DataSnapshot {
       venda('V1', '2026-03-05', 'ana souza', 4297),
       venda('V2', '2026-03-06', 'duda reis', 3997),
     ],
+    leadsComercial: [],
     midiaDiaria: [
       md('2026-03-01', 100, 1000, 100, 40, 20, 15, 12),
       md('2026-03-02', 300, 3000, 200, 80, 40, 30, 24),

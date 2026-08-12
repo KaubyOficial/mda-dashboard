@@ -1,0 +1,37 @@
+# Contexto de build do Docker.
+# O Dockerfile faz `COPY . .` no estágio de build; sem este arquivo, o .env, a chave da
+# service account e o cache SQLite (que contém PII de lead) entram na camada de build.
+# O estágio de runtime é multi-stage e não os copia, mas a imagem intermediária ficaria
+# com os segredos no host — e o contexto subiria node_modules inteiro a cada build.
+
+# deps (reinstaladas com npm ci dentro da imagem)
+node_modules/
+**/node_modules/
+
+# segredos — NUNCA no contexto de build
+.env
+.env.*
+!.env.example
+service-account*.json
+*.serviceaccount.json
+
+# cache de dados (reconstruível; contém PII de lead)
+data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite-journal
+*.db
+
+# saídas de build (regeradas dentro da imagem)
+server/dist/
+web/dist/
+*.tsbuildinfo
+
+# não são necessários para `npm ci` + `npm run build`
+.git/
+.github/
+docs/
+*.log
+.DS_Store
+Thumbs.db

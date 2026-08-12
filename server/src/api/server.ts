@@ -8,6 +8,7 @@ import { PROJECT_ROOT } from '../config.js';
 import type { Db } from '../db/db.js';
 import { getLastSync, readSnapshot } from '../db/repo.js';
 import { computeMetrics } from '../metrics/compute.js';
+import { loadComercialConfig } from '../metrics/comercial.js';
 import { RangeError, previousRange, validateRange } from '../metrics/period.js';
 import { isStale, type SyncEngine } from '../sync/sync.js';
 import { registerAuth, registerSecurityHeaders } from './security.js';
@@ -34,6 +35,8 @@ class RangeCache {
 export function buildServer(cfg: AppConfig, db: Db, sync: SyncEngine): FastifyInstance {
   const app = Fastify({ logger: { level: 'info' }, trustProxy: true });
   const cache = new RangeCache();
+  // lida uma vez no boot — mudar config/comercial.json exige reiniciar o server (igual .env)
+  const comercialCfg = loadComercialConfig(cfg.comercialPath);
 
   registerSecurityHeaders(app);
   registerAuth(app, cfg);
@@ -45,7 +48,9 @@ export function buildServer(cfg: AppConfig, db: Db, sync: SyncEngine): FastifyIn
     const info = getLastSync(db);
     return {
       status: 'ok',
-      source: cfg.dataSource,
+      // nome REAL da fonte composta (ex.: 'sheet (sheet-api) + meta'), não só o DATA_SOURCE:
+      // servidor zumbi com fonte diferente da esperada já derrubou um dia de dado aqui.
+      source: sync.sourceName,
       lastSync: info.lastSync,
       stale: isStale(info.lastSync),
       syncing: sync.isRunning(),
@@ -68,12 +73,18 @@ export function buildServer(cfg: AppConfig, db: Db, sync: SyncEngine): FastifyIn
 
     const snap = readSnapshot(db);
     const info = getLastSync(db);
-    const result = computeMetrics(snap, range, {
-      lastSync: info.lastSync,
-      stale: isStale(info.lastSync),
-      source: cfg.dataSource,
-      extraWarnings: info.warnings,
-    }, preset || undefined);
+    const result = computeMetrics(
+      snap,
+      range,
+      {
+        lastSync: info.lastSync,
+        stale: isStale(info.lastSync),
+        source: sync.sourceName,
+        extraWarnings: info.warnings,
+        comercial: comercialCfg,
+      },
+      preset || undefined,
+    );
     cache.set(cacheKey, result);
     return result;
   });

@@ -3,6 +3,7 @@ import type {
   Agendamento,
   DataSnapshot,
   Lead,
+  LeadComercial,
   MidiaAnuncio,
   MidiaDiaria,
   MidiaPublico,
@@ -21,6 +22,7 @@ export function writeSnapshot(db: Db, snap: DataSnapshot): void {
       'leads',
       'agendamentos',
       'vendas',
+      'leads_comercial',
       'midia_diaria',
       'midia_publico',
       'midia_anuncio',
@@ -48,9 +50,19 @@ export function writeSnapshot(db: Db, snap: DataSnapshot): void {
     }
 
     const insV = db.prepare(
-      `INSERT OR REPLACE INTO vendas (id,date,email_key,phone_key,name_key,valor_brl) VALUES (?,?,?,?,?,?)`,
+      `INSERT OR REPLACE INTO vendas (id,date,email_key,phone_key,name_key,valor_brl,utm_source,utm_medium,sck) VALUES (?,?,?,?,?,?,?,?,?)`,
     );
-    for (const v of snap.vendas) insV.run(v.id, v.date, v.emailKey, v.phoneKey, v.nameKey, v.valorBRL);
+    for (const v of snap.vendas)
+      insV.run(
+        v.id, v.date, v.emailKey, v.phoneKey, v.nameKey, v.valorBRL,
+        v.utmSource ?? '', v.utmMedium ?? '', v.sck ?? '',
+      );
+
+    const insLc = db.prepare(
+      `INSERT OR REPLACE INTO leads_comercial (id,date,vendedor,email_key,phone_key,name_key) VALUES (?,?,?,?,?,?)`,
+    );
+    for (const lc of snap.leadsComercial)
+      insLc.run(lc.id, lc.date, lc.vendedor, lc.emailKey, lc.phoneKey, lc.nameKey);
 
     const insMd = db.prepare(
       `INSERT OR REPLACE INTO midia_diaria (date,investimento_brl,impressoes,alcance,cliques,cliques_botao_lp,vsl_plays,chegou_cadastro,forms_iniciados,forms_finalizados)
@@ -124,6 +136,19 @@ export function readSnapshot(db: Db): DataSnapshot {
       phoneKey: s(r.phone_key),
       nameKey: s(r.name_key),
       valorBRL: n(r.valor_brl),
+      utmSource: s(r.utm_source),
+      utmMedium: s(r.utm_medium),
+      sck: s(r.sck),
+    }),
+  );
+  const leadsComercial = (db.prepare('SELECT * FROM leads_comercial').all() as Row[]).map(
+    (r): LeadComercial => ({
+      id: s(r.id),
+      date: s(r.date),
+      vendedor: s(r.vendedor),
+      emailKey: s(r.email_key),
+      phoneKey: s(r.phone_key),
+      nameKey: s(r.name_key),
     }),
   );
   const midiaDiaria = (db.prepare('SELECT * FROM midia_diaria').all() as Row[]).map(
@@ -164,7 +189,16 @@ export function readSnapshot(db: Db): DataSnapshot {
       mqls: n(r.mqls),
     }),
   );
-  return { leads, agendamentos, vendas, midiaDiaria, midiaPublico, midiaAnuncio, warnings: [] };
+  return {
+    leads,
+    agendamentos,
+    vendas,
+    leadsComercial,
+    midiaDiaria,
+    midiaPublico,
+    midiaAnuncio,
+    warnings: [],
+  };
 }
 
 export interface SyncRunInfo {

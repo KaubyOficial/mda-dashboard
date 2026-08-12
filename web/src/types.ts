@@ -119,6 +119,25 @@ export interface AnuncioRow {
   custoPorMql: number | null;
   taxaCliqueForms: number | null;
 }
+/** Seção Comercial — vendas por link rastreado do vendedor (UTM do checkout) × lista de leads. */
+export interface ComercialVendedorRow {
+  vendedor: string;
+  slug: string;
+  leadsLista: number;
+  vendas: number;
+  conversao: number | null;
+  faturamentoBruto: number;
+  comissaoPct: number | null;
+  comissaoBRL: number | null;
+  liquidoBRL: number | null;
+}
+export interface ComercialSection {
+  configurado: boolean;
+  vendedores: ComercialVendedorRow[];
+  vendasSemLinkRastreado: { vendedor: string; date: string; valorBRL: number; utmDaVenda: string | null }[];
+  mediumsDesconhecidos: string[];
+  cobertura: { comUtm: number; total: number };
+}
 export interface MetricsResponse {
   range: Range;
   previousRange: Range;
@@ -132,6 +151,7 @@ export interface MetricsResponse {
   porPublico: PublicoRow[];
   porAnuncio: AnuncioRow[];
   origensOrganico: OrigemOrganicaRow[];
+  comercial: ComercialSection;
   meta: {
     lastSync: string | null;
     stale: boolean;

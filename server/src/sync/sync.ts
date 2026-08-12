@@ -8,7 +8,13 @@ export interface SyncResult {
   source: string;
   counts: Record<string, number>;
   warnings: string[];
-  matchReport: { byEmail: number; byPhone: number; byName: number; unmatched: number; totalVendas: number };
+  matchReport: {
+    byEmail: number;
+    byPhone: number;
+    byName: number;
+    unmatched: number;
+    totalVendas: number;
+  };
   error?: string;
   skipped?: boolean;
 }
@@ -28,6 +34,11 @@ export class SyncEngine {
 
   isRunning(): boolean {
     return this.running;
+  }
+
+  /** Nome da fonte efetivamente em uso (a composta inclui '+ meta'). */
+  get sourceName(): string {
+    return this.source.name;
   }
 
   /** Executa um sync. Se já houver um em andamento, retorna skipped (lock). */
@@ -58,6 +69,7 @@ export class SyncEngine {
         leads: snap.leads.length,
         agendamentos: snap.agendamentos.length,
         vendas: snap.vendas.length,
+        leadsComercial: snap.leadsComercial.length,
         midiaDiaria: snap.midiaDiaria.length,
         midiaPublico: snap.midiaPublico.length,
         midiaAnuncio: snap.midiaAnuncio.length,
@@ -66,12 +78,24 @@ export class SyncEngine {
         .prepare(
           `UPDATE sync_runs SET finished_at=?, status='ok', counts_json=?, warnings_json=? WHERE id=?`,
         )
-        .run(new Date().toISOString(), JSON.stringify(counts), JSON.stringify(snap.warnings), syncId);
+        .run(
+          new Date().toISOString(),
+          JSON.stringify(counts),
+          JSON.stringify(snap.warnings),
+          syncId,
+        );
       this.db
         .prepare(
           `INSERT OR REPLACE INTO match_report (sync_id,by_email,by_phone,by_name,unmatched,total_vendas) VALUES (?,?,?,?,?,?)`,
         )
-        .run(syncId, match.report.byEmail, match.report.byPhone, match.report.byName, match.report.unmatched, match.report.totalVendas);
+        .run(
+          syncId,
+          match.report.byEmail,
+          match.report.byPhone,
+          match.report.byName,
+          match.report.unmatched,
+          match.report.totalVendas,
+        );
       return {
         status: 'ok',
         source: this.source.name,

@@ -19,6 +19,8 @@ import { enrichLeads } from '../crossjoin/match.js';
 import { qualifByAnuncio, qualifByPublico } from '../crossjoin/attribution.js';
 import { isInRange, eachDay, previousRange, daysInclusive } from './period.js';
 import { makeDelta, safeDiv, sum } from './helpers.js';
+import type { ComercialConfig } from './comercial.js';
+import { computeComercial } from './comercial.js';
 
 interface BaseAgg {
   faturamento: number;
@@ -551,6 +553,8 @@ export interface ComputeMeta {
   stale: boolean;
   source: string;
   extraWarnings: string[];
+  /** config da seção Comercial (config/comercial.json) — ausente = seção não configurada. */
+  comercial?: ComercialConfig | null;
 }
 
 /** Motor completo: DataSnapshot + range → MetricsResponse (§4). Função PURA (testável isolada). */
@@ -581,6 +585,7 @@ export function computeMetrics(
     porPublico: computePorPublico(snap, enriched, range, warnings),
     porAnuncio: computePorAnuncio(snap, enriched, range, warnings),
     origensOrganico: computeOrigensOrganico(enriched, range),
+    comercial: computeComercial(snap, range, meta.comercial ?? null, warnings),
     meta: {
       lastSync: meta.lastSync,
       stale: meta.stale,

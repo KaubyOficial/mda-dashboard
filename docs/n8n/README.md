@@ -1,9 +1,22 @@
-# n8n — Diagnóstico e correção dos fluxos da planilha OCDM (2026-07-23, atualizado 2026-08-03)
+# n8n — Diagnóstico e correção dos fluxos da planilha OCDM (2026-07-23, atualizado 2026-08-07)
 
 Investigação disparada por: *"um dos dias teve 44 leads pagos, 54 respostas no formulário,
 e na lista de leads não tem nenhum"*. Tudo abaixo foi medido na **planilha real**
 (`1M3B5pg…`, via service account read-only do dashboard) e nos **exports reais** dos fluxos n8n.
 
+> **Atualização 2026-08-07 — o fluxo de vendas passa a gravar a UTM DO CHECKOUT.** O arquivo
+> virou `[FLUXO DE VENDAS] … CORRIGIDO 2026-08-07.json`: o nó *Append row in sheet* agora mapeia
+> também **`Utm Source` · `Utm Medium` · `SCK`** (colunas criadas ao fim da aba VENDAS por
+> `npm run comercial:init -- --vendas-cols`). É o que alimenta a seção **Comercial** do dashboard
+> — vendas atribuídas ao vendedor (leo/gabriel) pelo LINK usado no checkout, não pelo lead.
+> Cada expressão tenta primeiro o campo direto do payload (`data.utm_source` etc. — a API de
+> orders da Cakto tem esses campos por venda) e cai para extrair da query string de
+> `data.checkoutUrl` se o campo não vier. ⚠️ **O payload do webhook não está documentado pela
+> Cakto**: depois de importar, conferir a PRIMEIRA venda nova — se as 3 células saírem vazias
+> numa venda que TEM utm no painel, abrir a execution no n8n, ver onde a UTM mora no `body.data`
+> e ajustar o path nas 3 expressões. O histórico não depende disso: `npm run backfill:utm`
+> preenche as colunas a partir do export oficial.
+>
 > **Atualização 2026-08-03 — o fluxo de vendas passa a gravar o TELEFONE do comprador.** O
 > arquivo desta pasta virou `[FLUXO DE VENDAS] … CORRIGIDO 2026-08-03.json`: o nó *Append row
 > in sheet* mapeia `data.customer.phone` na coluna **`Phone`** (col. I da aba VENDAS, criada

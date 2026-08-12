@@ -197,6 +197,7 @@ export class MockSource implements DataSource {
       leads,
       agendamentos,
       vendas,
+      leadsComercial: [],
       midiaDiaria,
       midiaPublico,
       midiaAnuncio,

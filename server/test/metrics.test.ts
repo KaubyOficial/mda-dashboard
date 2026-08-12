@@ -414,6 +414,97 @@ test('edge cases — range de 1 dia e range futuro sem dados', () => {
   assert.equal(future.kpis.find((k) => k.key === 'roas')!.value, 0); // 0/0 → safeDiv null → 0
 });
 
+// ─────────────────────────────── Seção Comercial (2026-08-07) ───────────────────────────────
+
+const COMERCIAL_CFG = {
+  vendedores: [
+    { slug: 'leo', nome: 'Leo', comissaoPct: 10 },
+    { slug: 'gabriel', nome: 'Gabriel', comissaoPct: null },
+  ],
+  foraDaSecao: ['gui'],
+};
+
+/** fixture + vendas com UTM + lista comercial — cenário completo da seção. */
+function fixtureComercial() {
+  const snap = fixture();
+  snap.vendas = [
+    ...snap.vendas,
+    // venda do leo pelo link rastreado (caso Samuel: lead antigo, comprou pelo link)
+    { id: 'V3', date: '2026-03-10', emailKey: 'samuel@x.test', phoneKey: '', nameKey: 'samuel paula', valorBRL: 4294.51, utmSource: 'Comercial', utmMedium: 'leo', sck: 'OCDM_Comercial_leo_comercial-leo_comercial' },
+    // linha backfillada só com SCK (sem medium) → ainda atribui ao leo
+    { id: 'V4', date: '2026-03-12', emailKey: 'marcia@x.test', phoneKey: '', nameKey: 'marcia barreto', valorBRL: 4127.36, utmSource: '', utmMedium: '', sck: 'OCDM_Comercial_leo_comercial-leo_comercial' },
+    // venda do gui = funil do forms → NÃO entra na seção nem vira medium desconhecido
+    { id: 'V5', date: '2026-03-15', emailKey: 'g@x.test', phoneKey: '', nameKey: 'cliente gui', valorBRL: 1000, utmSource: 'Comercial', utmMedium: 'gui', sck: '' },
+    // vendedor novo sem cadastro → alerta de medium desconhecido
+    { id: 'V6', date: '2026-03-16', emailKey: 'n@x.test', phoneKey: '', nameKey: 'cliente novo', valorBRL: 2000, utmSource: 'Comercial', utmMedium: 'novato', sck: '' },
+    // contato DA LISTA do gabriel que comprou SEM o link rastreado → alerta de auditoria
+    { id: 'V7', date: '2026-03-20', emailKey: 'lista@x.test', phoneKey: '', nameKey: 'pessoa da lista', valorBRL: 3000, utmSource: '', utmMedium: '', sck: '' },
+  ];
+  snap.leadsComercial = [
+    { id: 'leo|l1@x.test', date: '2026-03-01', vendedor: 'leo', emailKey: 'l1@x.test', phoneKey: '', nameKey: 'contato um' },
+    { id: 'leo|samuel@x.test', date: '2026-03-02', vendedor: 'leo', emailKey: 'samuel@x.test', phoneKey: '', nameKey: 'samuel paula' },
+    { id: 'gabriel|lista@x.test', date: '2026-03-05', vendedor: 'gabriel', emailKey: 'lista@x.test', phoneKey: '', nameKey: 'pessoa da lista' },
+    // sem data → conta em qualquer período
+    { id: 'gabriel|semdata@x.test', date: '', vendedor: 'gabriel', emailKey: 'semdata@x.test', phoneKey: '', nameKey: 'sem data' },
+    // fora do período (não conta em março)
+    { id: 'leo|abril@x.test', date: '2026-04-01', vendedor: 'leo', emailKey: 'abril@x.test', phoneKey: '', nameKey: 'so em abril' },
+  ];
+  return snap;
+}
+
+test('comercial — atribuição por UTM (medium e SCK), gui fora, comissão e conversão', () => {
+  const r = computeMetrics(fixtureComercial(), MARCO, { ...META, comercial: COMERCIAL_CFG });
+  const c = r.comercial;
+  assert.equal(c.configurado, true);
+
+  const leo = c.vendedores.find((v) => v.slug === 'leo')!;
+  assert.equal(leo.vendas, 2); // V3 (medium) + V4 (só sck)
+  near(leo.faturamentoBruto, 4294.51 + 4127.36);
+  assert.equal(leo.leadsLista, 2); // contato um + samuel (abril fica fora)
+  near(leo.conversao, 2 / 2);
+  near(leo.comissaoBRL!, (4294.51 + 4127.36) * 0.1);
+  near(leo.liquidoBRL!, (4294.51 + 4127.36) * 0.9);
+
+  const gabriel = c.vendedores.find((v) => v.slug === 'gabriel')!;
+  assert.equal(gabriel.vendas, 0);
+  assert.equal(gabriel.leadsLista, 2); // pessoa da lista + sem-data
+  assert.equal(gabriel.comissaoBRL, null); // % não configurada
+
+  // gui não vira linha nem medium desconhecido; 'novato' vira alerta
+  assert.ok(!c.vendedores.some((v) => v.slug === 'gui'));
+  assert.deepEqual(c.mediumsDesconhecidos, ['novato']);
+  assert.ok(r.meta.warnings.some((w) => w.includes('novato')));
+
+  // auditoria: pessoa da lista do gabriel comprou sem link rastreado
+  assert.equal(c.vendasSemLinkRastreado.length, 1);
+  assert.equal(c.vendasSemLinkRastreado[0]!.vendedor, 'Gabriel');
+  assert.equal(c.vendasSemLinkRastreado[0]!.utmDaVenda, null);
+  near(c.vendasSemLinkRastreado[0]!.valorBRL, 3000);
+
+  // cobertura: das 7 vendas de março, 4 têm alguma UTM (V3, V4, V5, V6)
+  assert.deepEqual(c.cobertura, { comUtm: 4, total: 7 });
+});
+
+test('comercial — sem config a seção vem desconfigurada e nada quebra', () => {
+  const r = computeMetrics(fixtureComercial(), MARCO, META); // META sem `comercial`
+  assert.equal(r.comercial.configurado, false);
+  assert.equal(r.comercial.vendedores.length, 0);
+});
+
+test('comercial — venda da lista casada mas marcada com o link de OUTRO vendedor vira alerta com o medium', () => {
+  const snap = fixtureComercial();
+  // samuel está na LISTA do leo, mas a venda veio marcada como gabriel
+  snap.vendas = snap.vendas.map((v) =>
+    v.id === 'V3' ? { ...v, utmMedium: 'gabriel', sck: '' } : v,
+  );
+  const r = computeMetrics(snap, MARCO, { ...META, comercial: COMERCIAL_CFG });
+  const alerta = r.comercial.vendasSemLinkRastreado.find((a) => a.vendedor === 'Leo');
+  assert.ok(alerta, 'venda do samuel deveria virar alerta na lista do leo');
+  assert.equal(alerta!.utmDaVenda, 'gabriel');
+  // e a venda conta pro gabriel (a UTM manda na atribuição)
+  assert.equal(r.comercial.vendedores.find((v) => v.slug === 'gabriel')!.vendas, 1);
+});
+
 test('sensibilidade — mutar uma venda muda o faturamento (prova do golden)', () => {
   const f = fixture();
   const base = computeMetrics(f, MARCO, META).kpis.find((k) => k.key === 'faturamento')!.value;

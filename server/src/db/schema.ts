@@ -34,9 +34,21 @@ CREATE TABLE IF NOT EXISTS vendas (
   email_key TEXT NOT NULL,
   phone_key TEXT NOT NULL,
   name_key  TEXT NOT NULL DEFAULT '',
-  valor_brl REAL NOT NULL DEFAULT 0
+  valor_brl REAL NOT NULL DEFAULT 0,
+  utm_source TEXT NOT NULL DEFAULT '',
+  utm_medium TEXT NOT NULL DEFAULT '',
+  sck        TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_vendas_date ON vendas(date);
+
+CREATE TABLE IF NOT EXISTS leads_comercial (
+  id        TEXT PRIMARY KEY,
+  date      TEXT NOT NULL DEFAULT '',
+  vendedor  TEXT NOT NULL DEFAULT '',
+  email_key TEXT NOT NULL DEFAULT '',
+  phone_key TEXT NOT NULL DEFAULT '',
+  name_key  TEXT NOT NULL DEFAULT ''
+);
 
 CREATE TABLE IF NOT EXISTS midia_diaria (
   date              TEXT PRIMARY KEY,

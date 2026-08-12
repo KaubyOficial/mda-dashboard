@@ -1,0 +1,8 @@
+{
+  "_comentario": "Seção Comercial do dashboard. `slug` = utm_medium do link rastreado do vendedor (pay.cakto.com.br/...&utm_medium=<slug>). `comissaoPct` = % do vendedor sobre o faturamento líquido Cakto das vendas dele — null mostra a comissão como 'configurar'. `foraDaSecao` = mediums de pessoa-que-vende que NÃO entram na seção (gui é o funil do forms, decisão Kauê 2026-08-07).",
+  "vendedores": [
+    { "slug": "leo", "nome": "Leo", "comissaoPct": null },
+    { "slug": "gabriel", "nome": "Gabriel", "comissaoPct": null }
+  ],
+  "foraDaSecao": ["gui"]
+}

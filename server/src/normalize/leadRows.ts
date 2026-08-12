@@ -1,6 +1,7 @@
 import type {
   Agendamento,
   Lead,
+  LeadComercial,
   MidiaAnuncio,
   MidiaDiaria,
   MidiaPublico,
@@ -179,6 +180,12 @@ export function parseVendaRows(
   // Ausente/vazia → phoneKey '' e o casamento segue como antes (e-mail → nome).
   const iPhone = col('Phone', 'Telefone', 'CellPhone', 'Celular', 'Whatsapp', 'WhatsApp');
   const iValor = col('Valor', 'Valor da Venda', 'Faturamento');
+  // UTM DO CHECKOUT — colunas opcionais (2026-08-07), gravadas pelo n8n a partir do webhook da
+  // Cakto e backfilladas do export oficial. Sem elas a venda fica com utm '' (comportamento
+  // antigo) e a seção Comercial só enxerga o que o casamento com a lista mostrar.
+  const iUtmSource = col('Utm Source', 'Utm_source', 'UTM_SOURCE', 'utm_source');
+  const iUtmMedium = col('Utm Medium', 'Utm_medium', 'UTM_MEDIUM', 'utm_medium');
+  const iSck = col('SCK', 'sck', 'Sck');
   const out: Venda[] = [];
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r]!;
@@ -192,6 +199,9 @@ export function parseVendaRows(
       phoneKey: normalizePhone(get(row, iPhone)),
       nameKey: normalizeName(get(row, iName)),
       valorBRL: parseMoneyBRL(get(row, iValor)) ?? 0,
+      utmSource: get(row, iUtmSource).trim(),
+      utmMedium: get(row, iUtmMedium).trim(),
+      sck: get(row, iSck).trim(),
     });
   }
   if (iValor === undefined) warnings.push('VENDAS: coluna Valor não encontrada — faturamento = 0.');
@@ -287,7 +297,18 @@ export function dedupeSplitPayments(vendas: Venda[], warnings: string[]): Venda[
       // mantém id/chaves/data da 1ª parte e soma o valor; o telefone vem da 1ª parte que TIVER
       // um (parcela antiga sem a coluna Phone não pode apagar o telefone de uma parte posterior).
       const phoneKey = first.phoneKey || run.find((x) => x.phoneKey)?.phoneKey || '';
-      out.push({ ...first, phoneKey, valorBRL: valor });
+      // idem para a UTM do checkout: numa venda dividida, a PRIMEIRA parte que registrou UTM
+      // define o link (o trio source/medium/sck viaja junto — não misturar campos de partes
+      // diferentes).
+      const comUtm = run.find((x) => x.utmSource || x.utmMedium || x.sck) ?? first;
+      out.push({
+        ...first,
+        phoneKey,
+        valorBRL: valor,
+        utmSource: comUtm.utmSource ?? '',
+        utmMedium: comUtm.utmMedium ?? '',
+        sck: comUtm.sck ?? '',
+      });
       merges.push(`${first.nameKey || first.emailKey} (${run.length}× = R$ ${valor.toFixed(2)})`);
     };
     for (let i = 1; i < rows.length; i++) {
@@ -314,6 +335,67 @@ export function dedupeSplitPayments(vendas: Venda[], warnings: string[]): Venda[
     );
   }
   return out;
+}
+
+// ─────────────────────────────────────── LEADS COMERCIAL ─────────────────────────────────────
+/**
+ * Aba LEADS COMERCIAL (opcional): a lista de contatos que cada vendedor trabalha, colada do CSV
+ * que ele exporta. Colunas: Data · Vendedor · Nome · E-mail · Telefone (qualquer ordem; a linha
+ * só precisa de UMA chave — nome, e-mail ou telefone — pra poder casar com a venda depois).
+ * Linha SEM data é aceita (conta em qualquer período) — o aviso denuncia pra não virar hábito.
+ * Dedup: o mesmo contato colado 2× na lista do mesmo vendedor conta uma vez.
+ */
+export function parseLeadComercialRows(rows: string[][], warnings: string[]): LeadComercial[] {
+  if (rows.length < 2) return [];
+  const col = colFinder(rows[0]!);
+  const iDate = col('Data', 'Data e Hora', 'Date');
+  const iVendedor = col('Vendedor', 'Comercial', 'Responsável', 'Responsavel');
+  const iName = col('Nome', 'Name', 'Cliente');
+  const iEmail = col('E-mail', 'Email');
+  const iPhone = col('Telefone', 'Phone', 'CellPhone', 'Celular', 'Whatsapp', 'WhatsApp', 'Número', 'Numero');
+
+  const dedup = new Map<string, LeadComercial>();
+  let quarantined = 0;
+  let semData = 0;
+  let semVendedor = 0;
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r]!;
+    const emailKey = normalizeEmail(get(row, iEmail));
+    const phoneKey = normalizePhone(get(row, iPhone));
+    const nameKey = normalizeName(get(row, iName));
+    if (!emailKey && !phoneKey && !nameKey) {
+      quarantined++;
+      continue;
+    }
+    const date = parseDateISO(get(row, iDate)) ?? '';
+    if (!date) semData++;
+    const vendedor = get(row, iVendedor).trim().toLowerCase();
+    if (!vendedor) semVendedor++;
+    const lead: LeadComercial = {
+      id: `${vendedor}|${emailKey || phoneKey || nameKey}`,
+      date,
+      vendedor,
+      emailKey,
+      phoneKey,
+      nameKey,
+    };
+    const existing = dedup.get(lead.id);
+    // repetido: fica a linha COM data mais antiga (entrou na lista primeiro)
+    if (!existing || (lead.date !== '' && (existing.date === '' || lead.date < existing.date))) {
+      dedup.set(lead.id, lead);
+    }
+  }
+  if (quarantined > 0)
+    warnings.push(`LEADS COMERCIAL: ${quarantined} linha(s) sem nome/e-mail/telefone (ignoradas).`);
+  if (semData > 0)
+    warnings.push(
+      `LEADS COMERCIAL: ${semData} linha(s) sem Data — entram na contagem de QUALQUER período. Preencher a data em que o contato entrou na lista deixa a conversão do mês correta.`,
+    );
+  if (semVendedor > 0)
+    warnings.push(
+      `LEADS COMERCIAL: ${semVendedor} linha(s) sem Vendedor — não contam pra nenhum vendedor na seção Comercial. Preencher com o slug do link (leo, gabriel…).`,
+    );
+  return [...dedup.values()];
 }
 
 // ──────────────────────────────── ACOMPANHAMENTO DIÁRIO (mídia) ───────────────────────────────

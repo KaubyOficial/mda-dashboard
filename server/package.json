@@ -9,9 +9,11 @@
     "build": "tsc -p tsconfig.json",
     "start": "node --experimental-sqlite dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --experimental-sqlite --import tsx/esm --test --test-reporter spec test/units.test.ts test/metrics.test.ts test/db.test.ts test/sheetapi.test.ts",
+    "test": "node --experimental-sqlite --import tsx/esm --test --test-reporter spec test/units.test.ts test/metrics.test.ts test/db.test.ts test/sheetapi.test.ts test/meta.test.ts",
     "sync": "node --experimental-sqlite --import tsx/esm src/cli/sync.ts",
-    "backfill:phone": "node --experimental-sqlite --import tsx/esm src/cli/backfillVendasPhone.ts"
+    "backfill:phone": "node --experimental-sqlite --import tsx/esm src/cli/backfillVendasPhone.ts",
+    "backfill:utm": "node --experimental-sqlite --import tsx/esm src/cli/backfillVendasUtm.ts",
+    "comercial:init": "node --experimental-sqlite --import tsx/esm src/cli/comercialInit.ts"
   },
   "dependencies": {
     "@fastify/rate-limit": "^10.2.1",

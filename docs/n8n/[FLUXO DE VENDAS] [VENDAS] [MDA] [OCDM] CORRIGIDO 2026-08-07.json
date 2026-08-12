@@ -1,5 +1,5 @@
 {
-  "name": "[FLUXO DE VENDAS] [VENDAS] [MDA] [OCDM] (CORRIGIDO 2026-08-03)",
+  "name": "[FLUXO DE VENDAS] [VENDAS] [MDA] [OCDM] (CORRIGIDO 2026-08-07)",
   "nodes": [
     {
       "parameters": {
@@ -88,7 +88,10 @@
             "Valor": "={{ Number($json.body.data.commissions && $json.body.data.commissions.length ? $json.body.data.commissions[0].totalAmount : $json.body.data.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}",
             "SOMA DE LEADS": "1",
             "Nome": "={{ $json.body.data.customer.name }}",
-            "Phone": "={{ $json.body.data.customer.phone || '' }}"
+            "Phone": "={{ $json.body.data.customer.phone || '' }}",
+            "Utm Source": "={{ $json.body.data.utm_source || decodeURIComponent((($json.body.data.checkoutUrl || '').match(/[?&]utm_source=([^&]+)/) || [])[1] || '') }}",
+            "Utm Medium": "={{ $json.body.data.utm_medium || decodeURIComponent((($json.body.data.checkoutUrl || '').match(/[?&]utm_medium=([^&]+)/) || [])[1] || '') }}",
+            "SCK": "={{ $json.body.data.sck || decodeURIComponent((($json.body.data.checkoutUrl || '').match(/[?&]sck=([^&]+)/) || [])[1] || '') }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -172,6 +175,33 @@
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "Utm Source",
+              "displayName": "Utm Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "Utm Medium",
+              "displayName": "Utm Medium",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "SCK",
+              "displayName": "SCK",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
             }
           ],
           "attemptToConvertTypes": false,

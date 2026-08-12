@@ -145,6 +145,43 @@ export interface AnuncioRow {
   taxaCliqueForms: number | null;
 }
 
+/**
+ * Seção Comercial: vendas fechadas pelos vendedores (leo, gabriel…), atribuídas pela UTM DO
+ * CHECKOUT (colunas Utm/SCK da aba VENDAS), cruzadas com a lista de leads de cada vendedor
+ * (aba LEADS COMERCIAL) para conversão e auditoria de uso do link rastreado.
+ */
+export interface ComercialVendedorRow {
+  vendedor: string; // nome de exibição
+  slug: string; // utm_medium do link
+  /** contatos na lista do vendedor no período (aba LEADS COMERCIAL, pela Data). */
+  leadsLista: number;
+  /** vendas do período com a UTM do vendedor no checkout. */
+  vendas: number;
+  /** vendas ÷ leads da lista — null quando a lista está vazia no período. */
+  conversao: number | null;
+  /** líquido Cakto (mesma base de faturamento do resto do dashboard). */
+  faturamentoBruto: number;
+  comissaoPct: number | null; // null = configurar em config/comercial.json
+  comissaoBRL: number | null;
+  /** faturamento − comissão do vendedor. */
+  liquidoBRL: number | null;
+}
+
+export interface ComercialSection {
+  /** false = config/comercial.json ausente ou sem vendedores. */
+  configurado: boolean;
+  vendedores: ComercialVendedorRow[];
+  /**
+   * AUDITORIA: venda de alguém que está na LISTA de um vendedor mas SEM a UTM dele no checkout
+   * — vendeu sem o link rastreado (utmDaVenda null) ou com o link de outro (slug/medium).
+   */
+  vendasSemLinkRastreado: { vendedor: string; date: string; valorBRL: number; utmDaVenda: string | null }[];
+  /** utm_source=Comercial com medium que não está na config — vendedor novo sem cadastro. */
+  mediumsDesconhecidos: string[];
+  /** quantas vendas do período têm QUALQUER UTM registrada (histórico sem backfill não tem). */
+  cobertura: { comUtm: number; total: number };
+}
+
 export interface MetricsResponse {
   range: Range;
   previousRange: Range;
@@ -158,6 +195,7 @@ export interface MetricsResponse {
   porPublico: PublicoRow[];
   porAnuncio: AnuncioRow[];
   origensOrganico: OrigemOrganicaRow[];
+  comercial: ComercialSection;
   meta: {
     lastSync: string | null;
     stale: boolean;

@@ -55,6 +55,28 @@ export interface Venda extends MatchKeys {
   id: string;
   date: string; // data da venda
   valorBRL: number; // valor REAL da venda (§4 D7) — aba VENDAS col 'Valor'
+  // UTM DO CHECKOUT (colunas opcionais `Utm Source`/`Utm Medium`/`SCK` da aba VENDAS, gravadas
+  // pelo n8n a partir do webhook da Cakto e backfilladas do export oficial). É a única forma de
+  // saber POR QUAL LINK a venda foi fechada — o lead casado diz de onde a PESSOA veio, não o
+  // link usado na compra (caso real: Samuel virou lead orgânico em março e comprou em julho
+  // pelo link rastreado do comercial). Linha sem as colunas → ''.
+  utmSource?: string;
+  utmMedium?: string;
+  sck?: string;
+}
+
+/**
+ * Aba LEADS COMERCIAL (opcional, criada 2026-08-07): a lista de contatos que cada vendedor do
+ * comercial (leo, gabriel…) trabalha no mês. Colada à mão a partir do CSV que o vendedor exporta.
+ * Serve para (a) medir conversão da lista → venda e (b) auditar se a venda de alguém da lista
+ * veio com o link rastreado do vendedor (utm_medium = slug).
+ */
+export interface LeadComercial extends MatchKeys {
+  id: string;
+  /** dia que entrou na lista; '' quando a linha não tem data (conta em qualquer período, com aviso). */
+  date: string;
+  /** slug do vendedor (minúsculo, igual ao utm_medium do link); '' quando a coluna não diz. */
+  vendedor: string;
 }
 
 /** Aba ACOMPANHAMENTO DIÁRIO (+ LP view/vídeo agregados da aba MÉTRICAS ADS por dia). */
@@ -102,6 +124,8 @@ export interface DataSnapshot {
   leads: Lead[];
   agendamentos: Agendamento[];
   vendas: Venda[];
+  /** aba LEADS COMERCIAL (opcional — [] quando a aba ainda não existe). */
+  leadsComercial: LeadComercial[];
   midiaDiaria: MidiaDiaria[];
   midiaPublico: MidiaPublico[];
   midiaAnuncio: MidiaAnuncio[];

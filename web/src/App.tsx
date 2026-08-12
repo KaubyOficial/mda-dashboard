@@ -10,6 +10,7 @@ import { LeadsDetail } from './components/LeadsDetail';
 import { CommercialFunnelView, MarketingFunnelView, PagoOrganicoFunnelView } from './components/Funnels';
 import { Segments } from './components/Segments';
 import { ReportAnuncio, ReportOrganico, ReportPublico } from './components/Reports';
+import { Comercial } from './components/Comercial';
 import { ErrorState, Loading } from './components/states';
 
 interface UrlState {
@@ -122,6 +123,7 @@ export function App() {
               <CommercialFunnelView funnel={data.commercialFunnel} />
             </div>
             <PagoOrganicoFunnelView data={data.funilPagoOrganico} />
+            <Comercial data={data.comercial} />
             <Segments segments={data.segments} />
             <ReportPublico rows={data.porPublico} />
             <ReportAnuncio rows={data.porAnuncio} />

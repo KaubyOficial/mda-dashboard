@@ -7,9 +7,12 @@ import { previousRange, validateRange, RangeError, daysInclusive } from '../src/
 import { enrichLeads } from '../src/crossjoin/match.js';
 import { adCode, publicoSlug } from '../src/crossjoin/attribution.js';
 import { columnLetter } from '../src/datasource/sheetsApi.js';
+import { readXlsxSheet, parseWorksheetXml } from '../src/util/xlsx.js';
+import { parseExportNumber, parseExportDate, nomeCompativel } from '../src/cli/exportCakto.js';
 import { mapOrigem, mapPagoOrganico, mapTemperatura, type UtmMap } from '../src/normalize/utm.js';
 import {
   parseLeadRows,
+  parseLeadComercialRows,
   parseVendaRows,
   parseMidiaDiariaRows,
   parseMidiaAnuncioRows,
@@ -434,4 +437,148 @@ test('parseVendaRows — mesmo e-mail distante (> janela) fica separado + avisa 
   const vendas = parseVendaRows(rows, warnings);
   assert.equal(vendas.length, 2); // recompra: NÃO une
   assert.ok(warnings.some((w) => w.includes('mais de 60 dias')));
+});
+
+// ── export da Cakto (.xlsx/.csv) — usado pelo backfill da coluna Phone ────────────────────
+const fixturePath = (name: string): string =>
+  resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures', name);
+
+test('readXlsxSheet — lê um .xlsx REAL (fixture gerada por Excel/openpyxl), com string, número, data e célula vazia', () => {
+  const rows = readXlsxSheet(fixturePath('cakto-export.xlsx'));
+  assert.equal(rows.length, 4);
+  assert.deepEqual(rows[0], [
+    'ID da Venda',
+    'Status da Venda',
+    'Nome do Cliente',
+    'Email do Cliente',
+    'Telefone do Cliente',
+    'Valor Base do Produto',
+    'Comissão',
+    'Data de Pagamento',
+  ]);
+  // número continua número (não vira string com vírgula) e a data vem como serial do Excel
+  assert.equal(rows[1]?.[5], 4297);
+  assert.equal(rows[1]?.[6], 4154.86);
+  assert.equal(parseExportDate(rows[1]?.[7] ?? null), '2025-09-15');
+  // e-mail vazio vira null SEM comer as colunas seguintes (o bug real do export)
+  assert.equal(rows[2]?.[3], null);
+  assert.equal(rows[2]?.[4], '5521912345678');
+  assert.equal(rows[2]?.[6], 1997.51);
+  // entidades XML são desescapadas
+  assert.equal(rows[2]?.[2], 'João "Zé" Gomes & Cia');
+});
+
+test('parseWorksheetXml — célula vazia self-closing NÃO encerra a linha (bug real do export da Cakto)', () => {
+  // `<c r="D2"/>` é célula vazia. Um regex que terminasse a linha no primeiro `/>` perderia
+  // E2 e F2 em silêncio — foi exatamente o que aconteceu com o export real.
+  const xml =
+    '<sheetData>' +
+    '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row>' +
+    '<row r="2"><c r="A2" t="str"><v>x</v></c><c r="D2"/><c r="E2"><v>42</v></c><c r="F2" t="s"><v>1</v></c></row>' +
+    '</sheetData>';
+  const rows = parseWorksheetXml(xml, ['cabeçalho', 'fim']);
+  assert.deepEqual(rows[0], ['cabeçalho', 'fim']);
+  assert.deepEqual(rows[1], ['x', null, null, null, 42, 'fim']);
+});
+
+test('parseExportNumber — número puro do xlsx, ponto decimal do CSV Cakto e formato BR', () => {
+  assert.equal(parseExportNumber(4154.86), 4154.86); // xlsx
+  assert.equal(parseExportNumber('4154.86'), 4154.86); // CSV da Cakto
+  assert.equal(parseExportNumber('R$ 4.154,86'), 4154.86); // reexportado pela planilha
+  assert.equal(parseExportNumber(''), null);
+  assert.equal(parseExportNumber(null), null);
+  assert.equal(parseExportNumber('lixo'), null);
+});
+
+test('parseExportDate — ISO com fuso do CSV, dd/MM/yyyy e serial do Excel caem no mesmo dia', () => {
+  assert.equal(parseExportDate('2026-07-31T18:36:07.937797-03:00'), '2026-07-31');
+  assert.equal(parseExportDate('31/07/2026'), '2026-07-31');
+  assert.equal(parseExportDate(46234), '2026-07-31'); // serial do Excel
+  assert.equal(parseExportDate(''), null);
+  assert.equal(parseExportDate(null), null);
+});
+
+test('nomeCompativel — aba tem só o primeiro nome, export tem o completo (token truncado também casa)', () => {
+  assert.equal(nomeCompativel('Maira', 'Maira Pinto Gomes'), true);
+  assert.equal(nomeCompativel('Maira Pint', 'Maira Pinto Gomes'), true); // token truncado na aba
+  assert.equal(nomeCompativel('MAÍRA', 'maira pinto gomes'), true); // acento/caixa
+  assert.equal(nomeCompativel('Maira Souza', 'Maira Pinto Gomes'), false);
+  // a direção que NÃO casa: a aba tem MAIS tokens do que o export (todo token da aba
+  // precisa achar par no export — é o que segura o falso positivo)
+  assert.equal(nomeCompativel('Maira Pinto Gomes', 'Maira'), false);
+  assert.equal(nomeCompativel('', 'Maira'), false);
+});
+
+// ─────────────────────────────── Seção Comercial (2026-08-07) ───────────────────────────────
+
+test('parseVendaRows — lê as colunas de UTM do checkout e fica vazio quando não existem', () => {
+  // header real da aba VENDAS depois do comercial:init --vendas-cols (J/K/L no fim)
+  const header = ['Data', 'Funil', 'Status', 'Nome', 'E-mail', 'Valor', 'SOMA DE LEADS', 'Mentores', 'Phone', 'Utm Source', 'Utm Medium', 'SCK'];
+  const rows = [
+    header,
+    // caso REAL: venda do Samuel pelo link do leo (export Cakto 31/07/2026)
+    ['31/07/2026', 'Aplicação', 'VENDA REALIZADA', 'Samuel Correa De Paula', 's@live.com', 'R$ 4.294,51', '1', '', '5511999990002', 'Comercial', 'leo', 'OCDM_Comercial_leo_comercial-leo_comercial'],
+    ['01/07/2026', 'Aplicação', 'VENDA REALIZADA', 'Antigo', 'a@gmail.com', 'R$ 100,00', '1', '', '', '', '', ''],
+  ];
+  const warnings: string[] = [];
+  const vendas = parseVendaRows(rows, warnings);
+  const samuel = vendas.find((v) => v.emailKey === 's@live.com')!;
+  assert.equal(samuel.utmSource, 'Comercial');
+  assert.equal(samuel.utmMedium, 'leo');
+  assert.equal(samuel.sck, 'OCDM_Comercial_leo_comercial-leo_comercial');
+  const antigo = vendas.find((v) => v.emailKey === 'a@gmail.com')!;
+  assert.equal(antigo.utmMedium, '');
+
+  // aba sem as colunas (histórico) → utm vazia, nada quebra
+  const semColuna = parseVendaRows(
+    [
+      ['Data', 'Status', 'Nome', 'E-mail', 'Valor'],
+      ['01/07/2026', 'VENDA REALIZADA', 'Antigo', 'a@gmail.com', 'R$ 100,00'],
+    ],
+    warnings,
+  );
+  assert.equal(semColuna[0]!.utmSource, '');
+  assert.equal(semColuna[0]!.utmMedium, '');
+});
+
+test('parseVendaRows — na união de pagamento dividido a UTM sobrevive (e viaja como trio, sem misturar partes)', () => {
+  const header = ['Data', 'Status', 'Nome', 'E-mail', 'Valor', 'Utm Source', 'Utm Medium', 'SCK'];
+  const rows = [
+    header,
+    // 1ª parte anterior às colunas de UTM (células vazias), 2ª parte com o link do leo
+    ['01/07/2026', 'VENDA REALIZADA', 'Cliente', 'c@x.com', 'R$ 2.000,00', '', '', ''],
+    ['03/07/2026', 'VENDA REALIZADA', 'Cliente', 'c@x.com', 'R$ 2.297,00', 'Comercial', 'leo', 'OCDM_Comercial_leo_comercial-leo_comercial'],
+  ];
+  const warnings: string[] = [];
+  const vendas = parseVendaRows(rows, warnings);
+  assert.equal(vendas.length, 1);
+  assert.equal(vendas[0]!.utmMedium, 'leo');
+  assert.equal(vendas[0]!.utmSource, 'Comercial');
+  assert.equal(Math.round(vendas[0]!.valorBRL * 100), 429700);
+});
+
+test('parseLeadComercialRows — aliases de coluna, dedup por contato e avisos de data/vendedor', () => {
+  const rows = [
+    ['Data', 'Vendedor', 'Nome', 'E-mail', 'Telefone'],
+    ['01/08/2026', 'Leo', 'Fulano da Silva', 'f@x.com', '5511999990001'],
+    // mesmo contato colado 2× na lista do leo → conta 1 (fica a data mais antiga)
+    ['05/08/2026', 'leo', 'Fulano da Silva', 'f@x.com', ''],
+    // sem data → aceito, com aviso
+    ['', 'gabriel', 'Beltrana Souza', 'b@x.com', ''],
+    // sem vendedor → aceito, com aviso (não conta pra ninguém)
+    ['02/08/2026', '', 'Ciclano', 'c@x.com', ''],
+    // sem nenhuma chave → quarentena
+    ['02/08/2026', 'leo', '', '', ''],
+  ];
+  const warnings: string[] = [];
+  const lista = parseLeadComercialRows(rows, warnings);
+  assert.equal(lista.length, 3);
+  const fulano = lista.find((l) => l.emailKey === 'f@x.com')!;
+  assert.equal(fulano.vendedor, 'leo'); // caixa normalizada
+  assert.equal(fulano.date, '2026-08-01'); // data mais antiga vence no dedup
+  assert.equal(fulano.phoneKey, '1199990001'); // canonizada (sem 55, sem nono dígito)
+  assert.equal(lista.find((l) => l.emailKey === 'b@x.com')!.date, '');
+  assert.ok(warnings.some((w) => w.includes('sem Data')));
+  assert.ok(warnings.some((w) => w.includes('sem Vendedor')));
+  assert.ok(warnings.some((w) => w.includes('sem nome/e-mail/telefone')));
 });

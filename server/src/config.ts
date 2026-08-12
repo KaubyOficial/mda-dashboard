@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import type { Funil } from './normalize/metaRows.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 /** raiz do projeto = server/src/.. /.. */
@@ -51,6 +52,30 @@ export interface AppConfig {
   dbPath: string;
   utmMapPath: string;
   vendaExclusionsPath: string;
+  comercialPath: string;
+  meta: MetaConfig;
+}
+
+/**
+ * Meta Marketing API (read-only). Ligada quando META_ACCESS_TOKEN e META_AD_ACCOUNT_ID
+ * existem — sem elas o dashboard roda exatamente como antes, só com a planilha.
+ */
+export interface MetaConfig {
+  enabled: boolean;
+  accessToken: string;
+  adAccountId: string;
+  apiVersion: string;
+  /** primeiro dia do backfill inicial (a Meta guarda ~37 meses) */
+  since: string;
+  /** janela repuxada a cada sync — a atribuição da Meta ainda mexe nos números por ~28 dias */
+  refreshDays: number;
+  /** dias por requisição (o backfill inteiro não cabe num pedido só) */
+  chunkDays: number;
+  /** funil mantido: 'ocdm' | 'c2' | 'outro' */
+  funil: Funil;
+  /** recalcular o investimento diário só com o funil acima (tira C2 do CPL/CAC/ROAS) */
+  applySpend: boolean;
+  storePath: string;
 }
 
 export function loadConfig(): AppConfig {
@@ -78,6 +103,7 @@ export function loadConfig(): AppConfig {
       midiaDiaria: env('SHEET_TAB_MIDIA_DIARIA', 'ACOMPANHAMENTO DIÁRIO'),
       midiaPublico: env('SHEET_TAB_MIDIA_PUBLICO', 'TOP PÚBLICOS'),
       midiaAnuncio: env('SHEET_TAB_MIDIA_ANUNCIO', 'MÉTRICAS ADS'),
+      leadsComercial: env('SHEET_TAB_LEADS_COMERCIAL', 'LEADS COMERCIAL'),
     },
     googleServiceAccountJson: resolvePath(
       env('GOOGLE_SERVICE_ACCOUNT_JSON', './service-account.json'),
@@ -94,6 +120,25 @@ export function loadConfig(): AppConfig {
     dbPath: resolve(PROJECT_ROOT, 'data', 'mda.sqlite'),
     utmMapPath: resolve(PROJECT_ROOT, 'config', 'utm-map.json'),
     vendaExclusionsPath: resolve(PROJECT_ROOT, 'config', 'vendas-exclusions.json'),
+    comercialPath: resolve(PROJECT_ROOT, 'config', 'comercial.json'),
+    meta: loadMetaConfig(),
+  };
+}
+
+function loadMetaConfig(): MetaConfig {
+  const accessToken = env('META_ACCESS_TOKEN');
+  const adAccountId = env('META_AD_ACCOUNT_ID');
+  return {
+    enabled: Boolean(accessToken && adAccountId) && env('META_ENABLED', 'true') !== 'false',
+    accessToken,
+    adAccountId,
+    apiVersion: env('META_API_VERSION', 'v23.0'),
+    since: env('META_SINCE', '2024-12-01'),
+    refreshDays: Number(env('META_REFRESH_DAYS', '35')),
+    chunkDays: Number(env('META_CHUNK_DAYS', '92')),
+    funil: env('META_FUNIL', 'ocdm') as Funil,
+    applySpend: env('META_APPLY_SPEND', 'true') !== 'false',
+    storePath: resolve(PROJECT_ROOT, 'data', 'meta-insights.json'),
   };
 }
 
