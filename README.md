@@ -1,6 +1,6 @@
 ﻿# Dashboard da Mentoria MDA
 
-Dashboard web de página única com todos os números do funil high-ticket do Caio: faturamento, investimento, lucro, leads, funil de marketing, funil comercial, segmentação MQL/Morno/Fora, relatórios por público e por anúncio — lidos de uma planilha Google Sheets, com filtro de período, comparação com período anterior e acesso protegido por SSO Google (Cloudflare Access).
+Dashboard web de página única com todos os números do funil high-ticket do Caio: faturamento, investimento, lucro, leads, funil de marketing, funil comercial, segmentação MQL/Morno/Fora, relatórios por público e por anúncio — lidos de uma planilha Google Sheets, com filtro de período, comparação com período anterior e acesso protegido por Cloudflare Access (One-time PIN por e-mail + allowlist).
 
 ## Stack
 - **server/** — Node 22 + Fastify + `node:sqlite` (cache), motor de métricas puro (§4).

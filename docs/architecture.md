@@ -81,7 +81,7 @@ batem ao centavo** com o cálculo manual. As abas C2 são de outro funil e não 
 
 ## 6. Segurança (Epic 5)
 
-1. **Perímetro:** Cloudflare Access (SSO Google + allowlist) na frente; origem só aceita o túnel (`cloudflared`), sem portas públicas.
+1. **Perímetro:** Cloudflare Access (One-time PIN por e-mail + allowlist) na frente; origem só aceita o túnel (`cloudflared`), sem portas públicas.
 2. **Defesa em profundidade:** `server/src/api/security.ts` valida o JWT `Cf-Access-Jwt-Assertion` em toda request `/api/*` (JWKS RS256 via `node:crypto`, checa `aud`/`exp`). Em dev, `AUTH_BYPASS=true` libera **só localhost**.
 3. **Headers:** CSP estrita, HSTS, X-Content-Type-Options, Referrer-Policy, frame-ancestors none.
 4. **PII zero:** API só devolve agregados; sem nomes/e-mails/telefones.
