@@ -17,7 +17,7 @@
 - **Stack:** Node ≥22 + Fastify 5 (backend, TypeScript) · React 18 + Vite 5 + Tailwind + Recharts (frontend).
 - **Dados:** lê uma **planilha Google** (Sheets API v4, read-only, service account) e guarda num
   **cache SQLite local**, ressincronizado a cada 20 min. Não existe banco de dados externo.
-- **Acesso:** **Cloudflare Access** (SSO Google + allowlist de e-mails) na frente, **sem porta pública**
+- **Acesso:** **Cloudflare Access** (One-time PIN por e-mail + allowlist de e-mails) na frente, **sem porta pública**
   no servidor. O app ainda revalida o JWT do Access por conta própria.
 - **Porta:** 8080 (`PORT`).
 - **Segredos:** um arquivo `.env` e uma **chave JSON de service account** — nenhum dos dois está no git.
@@ -54,7 +54,7 @@ Recursos: o processo é leve (cache de agregados em memória, SQLite em arquivo)
 2. **Planilha "Mestres do Algoritmo | OCDM"** — dona é a conta do Caio
    (`mestresdoalgoritmo@gmail.com`). A SA precisa estar compartilhada nela como **Leitor**.
 3. **Cloudflare** — conta com um domínio, para criar o **Tunnel** e o app do **Access**.
-   ⚠️ O domínio, o _team domain_ e o **AUD** do app **ainda não existem** — ver §11.
+   ✅ Em produção desde ago/2026 tudo isso já existe (domínio, _team domain_, AUD) — ver §11.
 
 ### Repositório
 
@@ -164,18 +164,24 @@ cd mda-dashboard
 bash deploy.sh
 ```
 
-### 4.1 ⚠️ Ajuste obrigatório no `docker-compose.yml`
+### 4.1 Bind mount da service account no `docker-compose.yml`
 
-A linha do bind mount da service account está **comentada** e com **nome diferente** do que o
-`.env` usa. Descomente e corrija para bater com `GOOGLE_SERVICE_ACCOUNT_JSON`:
+**Resolvido em 2026-08-21:** a linha do bind mount vem **ativa** no repo, com o mesmo nome que o
+`.env.example` usa (`GOOGLE_SERVICE_ACCOUNT_JSON=./service-account-mda.json`):
 
 ```yaml
 volumes:
   - mda-data:/app/data
-  - ./service-account-mda.json:/app/service-account-mda.json:ro # ← descomentar/corrigir
+  - ./service-account-mda.json:/app/service-account-mda.json:ro
 ```
 
-Sem isso o container sobe, mas todo sync falha com erro de credencial.
+Consequências práticas:
+
+- O arquivo **precisa existir** na raiz antes do `up` (§2.1). Bind mount de path inexistente faz o
+  Docker criar um **diretório** com esse nome no host, e todo sync falha com erro de credencial.
+- **Servidor que tinha editado essa linha à mão** (antes desta correção): no primeiro `git pull`
+  que trouxer este commit, rode antes `git checkout -- docker-compose.yml` para descartar a edição
+  local — o conteúdo final é o mesmo.
 
 ### 4.2 `.dockerignore` — por que ele existe
 
@@ -451,11 +457,16 @@ está documentado em `data-dictionary.md § VENDAS`.
 
 Estas coisas **bloqueiam ou condicionam** o deploy e dependem de decisão humana:
 
-1. **A hospedagem nunca foi formalizada** (Story 1.2). O plano previa VPS Hetzner CX22 + Cloudflare,
-   e o `docker-compose.yml`/`deploy.sh` já implementam essa topologia — mas **nenhum servidor foi
-   provisionado**. Qualquer host com Docker serve.
-2. **Cloudflare: domínio, _team domain_ e AUD não existem ainda.** Precisam ser criados (§6) antes
-   de preencher `CF_ACCESS_TEAM_DOMAIN` e `CF_ACCESS_AUD`.
+1. ✅ **Resolvido (ago/2026): a hospedagem existe.** O app está em produção em
+   `https://dash.mestresdoalgoritmo.com.br`, numa VPS Ubuntu 24.04 com Docker, pasta
+   `/opt/mda-dashboard`, stack compose `dashboard` + `cloudflared`, sem porta pública.
+   ⚠️ A VPS é **compartilhada** com outros stacks do cliente (n8n, Traefik): nunca rodar
+   `docker system|volume|image prune` nem `docker compose down` fora de `/opt/mda-dashboard`.
+   Detalhes operacionais (endereço, acesso SSH) ficam no runbook privado do operador —
+   **fora deste repo**.
+2. ✅ **Resolvido (ago/2026): domínio, _team domain_ e AUD existem.** O login em produção é por
+   **One-time PIN** (código no e-mail); quem entra é a policy "Emails autorizados" no
+   Cloudflare Zero Trust → Access — mudar a lista **não** exige deploy.
 3. **Service account está como Editor na planilha, não Leitor.** Foi elevada temporariamente para um
    backfill em 2026-08-03 e **precisa voltar para Leitor** — o dashboard nunca escreve.
 4. **`.github/workflows/ci.yml` não está no repositório remoto.** Para incluir:

@@ -9,8 +9,9 @@ services:
       AUTH_BYPASS: 'false'
     volumes:
       - mda-data:/app/data
-      # service account (read-only) montada de fora do repo, quando em modo sheet-api:
-      # - ./service-account.json:/app/service-account.json:ro
+      # service account (read-only) montada de fora do repo — nome tem que bater com o
+      # GOOGLE_SERVICE_ACCOUNT_JSON do .env; o arquivo PRECISA existir na raiz antes do up:
+      - ./service-account-mda.json:/app/service-account-mda.json:ro
     # SEM `ports:` — o acesso é só via cloudflared (túnel outbound). Sem porta pública.
     networks: [mda]
 
