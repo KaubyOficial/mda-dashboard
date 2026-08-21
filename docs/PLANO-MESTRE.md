@@ -15,8 +15,8 @@ Dashboard web de página única com todos os números da mentoria MDA (funil hig
 |---|---|---|
 | D1 | Acesso à planilha (dev) | Liberar "qualquer pessoa com o link — Leitor" na CÓPIA. Planilha REAL depois via **service account** (Caio compartilha com o e-mail da SA). ✅ **RESOLVIDO 2026-07-07:** Kauê liberou o link; export verificado (HTTP 200). Story 0.1 desbloqueada. |
 | D2 | Fonte das métricas de mídia | **100% planilha** (investimento, impressões, CPM, público, anúncio — equipe alimenta). Sem Meta API na V1. |
-| D3 | Hosting | Kauê pediu recomendação → **Recomendação: VPS Linux barata (Hetzner CX22 ~€4/mês) + Docker + Cloudflare Tunnel** (ver §5.3). Story 1.2 formaliza a decisão (gate). **Nota 2026-07-07: Kauê ainda NÃO decidiu** (conta Cloudflare/domínio/VPS em aberto) — decisão fica pra Story 1.2; não bloqueia Epics 0, 2, 3 e 4 (dev/staging rodam local). |
-| D4 | Autenticação | **Cloudflare Access com SSO Google** — allowlist de e-mails (Kauê, Caio, comercial). Defesa em profundidade: app também valida o JWT do Access. |
+| D3 | Hosting | Kauê pediu recomendação → **Recomendação: VPS Linux barata (Hetzner CX22 ~€4/mês) + Docker + Cloudflare Tunnel** (ver §5.3). Story 1.2 formaliza a decisão (gate). **Nota 2026-07-07: Kauê ainda NÃO decidiu** (conta Cloudflare/domínio/VPS em aberto) — decisão fica pra Story 1.2; não bloqueia Epics 0, 2, 3 e 4 (dev/staging rodam local). ✅ **RESOLVIDO ago/2026:** produção no ar em `dash.mestresdoalgoritmo.com.br` (VPS + Docker + Cloudflare Tunnel/Access — ver `DEPLOY.md` §11). |
+| D4 | Autenticação | **Cloudflare Access com SSO Google** — allowlist de e-mails (Kauê, Caio, comercial). Defesa em profundidade: app também valida o JWT do Access. *(Em produção o método de login ficou One-time PIN por e-mail, mesma allowlist.)* |
 | D5 | Temperatura vs Qualificação | **2 eixos distintos.** Temperatura (quente/morno/frio) vem da **UTM** (de onde veio). Qualificação (MQL/Morno/Fora do perfil) vem do **formulário** (renda ≥ R$2k + conhece +1 semana — regra já travada em `MDA/mentoria/`). Dashboard mostra os dois separados. |
 | D6 | Dados do comercial | **Cruzar abas da planilha** (LEADS × AGENDAMENTOS × VENDAS) por e-mail/telefone. Arquitetura deixa **adapter pluggable** pra plugar CRM depois sem reescrever. |
 | D7 | Faturamento | **Valor real por venda na planilha** (ticket médio real, não preço fixo). |
@@ -248,7 +248,7 @@ Browser ◄─(HTTPS+Access JWT)─ Fastify API ◄─ agregador por range de da
 - [x] ~~Ativar "qualquer pessoa com o link — Leitor" na planilha-CÓPIA~~ — ✅ feito 2026-07-07 (verificado, HTTP 200).
 - [x] ~~Responder as 3 ambiguidades do glossário~~ — ✅ respondidas 2026-07-07: CPL/custos por segmento = investimento total (simples > "certo"); taxas comerciais = etapa anterior; mês atual vs anterior = mesmos N dias corridos.
 - [ ] Aprovar wireframe (4.1), reconciliações (G2/G6) e UAT (6.4).
-- [ ] **EM ABERTO (Kauê ainda não sabe — decidir na Story 1.2, não bloqueia o dev):** conta Cloudflare + domínio/subdomínio e VPS (~€4/mês) — ou optar por staging local primeiro.
+- [x] ~~**EM ABERTO (Kauê ainda não sabe — decidir na Story 1.2, não bloqueia o dev):** conta Cloudflare + domínio/subdomínio e VPS (~€4/mês) — ou optar por staging local primeiro.~~ — ✅ resolvido ago/2026: produção em `dash.mestresdoalgoritmo.com.br` (ver `DEPLOY.md`).
 - [ ] Na virada pra real: pedir ao Caio pra compartilhar a planilha real com o e-mail da service account (Viewer).
 
 ---

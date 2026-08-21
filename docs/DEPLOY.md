@@ -473,8 +473,10 @@ Estas coisas **bloqueiam ou condicionam** o deploy e dependem de decisão humana
    `gh auth refresh -s workflow` → remover `.github/workflows/` do `.gitignore` → commit + push.
 5. **Não há e2e/smoke test automatizado de deploy** (Story 6.1 não executada). A verificação do §7 é
    manual e deve ser feita.
-6. **O `.dockerignore` novo não foi validado com `docker build`** — não havia Docker na máquina onde
-   foi escrito. Validar no primeiro deploy, com os comandos do §4.2.
+6. **O `.dockerignore` foi validado só em parte.** O `docker build` em si passou (a produção
+   está no ar via `docker compose up -d --build`), mas a inspeção da imagem do §4.2 — conferir
+   que a imagem final não contém `.env` nem a chave da SA — não tem registro de ter sido rodada.
+   Fazer na próxima oportunidade no servidor.
 7. **A árvore de trabalho local tem mudanças não commitadas** (ferramentas de backfill, docs, testes).
    Nada disso é necessário para rodar. Um clone do GitHub traz o estado do commit `71e1a3c`, que é
    o que este documento descreve.

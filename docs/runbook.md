@@ -39,12 +39,15 @@ node --experimental-sqlite server/dist/index.js    # com DATA_SOURCE=sheet-api n
 ## Deploy na VPS (Docker + Cloudflare Tunnel)
 
 > Versão detalhada, com pré-requisitos, segredos, verificação e armadilhas: **`DEPLOY.md`**.
+> ✅ **Feito em ago/2026** — produção no ar em `https://dash.mestresdoalgoritmo.com.br`
+> (VPS Ubuntu 24.04 com Docker, stack `dashboard` + `cloudflared`). Os passos abaixo ficam
+> como referência para reprovisionar do zero.
 
-1. Provisionar VPS (Hetzner CX22), instalar Docker + docker-compose.
+1. Provisionar uma VPS com Docker + docker-compose (qualquer host serve; o plano original citava Hetzner CX22).
 2. Copiar repo + `.env` (com `SHEET_ID`, `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`, `AUTH_BYPASS=false`).
 3. `bash deploy.sh` (build + up).
 4. Criar túnel Cloudflare (`cloudflared`) apontando `mda.<dominio>` → `http://localhost:8080`. **Nenhuma porta pública na VPS.**
-5. Criar app no **Cloudflare Access**: SSO Google, allowlist de e-mails (Kauê, Caio, comercial), copiar o **AUD** para `CF_ACCESS_AUD`.
+5. Criar app no **Cloudflare Access**: login por One-time PIN (código no e-mail) + allowlist de e-mails (Kauê, Caio, comercial), copiar o **AUD** para `CF_ACCESS_AUD`.
 
 ### Rollback
 

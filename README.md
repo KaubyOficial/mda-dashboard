@@ -50,7 +50,9 @@ segurança (JWT Access + headers + rate limit), Docker/CI/runbook.
 
 **Modo `sheet-api` implementado (2026-07-16)** — antes era um stub que lançava erro. Motivo: a fonte
 em uso (`sheet-csv`) era uma **cópia congelada em 2026-07-07** (último lead 07/07), que nunca
-atualizaria. Falta só o setup manual da service account (runbook § Service account) para ler a
-planilha **viva**. Outro bloqueio externo: hosting/Cloudflare (Kauê, Story 1.2).
+atualizaria. Os dois bloqueios externos da época (service account e hosting/Cloudflare, Story 1.2)
+foram resolvidos: **em produção desde ago/2026** em `https://dash.mestresdoalgoritmo.com.br`
+(Docker + Cloudflare Tunnel + Access com One-time PIN, planilha viva via `sheet-api` —
+ver `docs/DEPLOY.md`).
 
 Ver `docs/stories/README.md` e `docs/data-dictionary.md`.
